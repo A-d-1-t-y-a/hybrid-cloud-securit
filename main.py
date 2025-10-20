@@ -407,7 +407,12 @@ async def store_data_in_aws(data: Dict[str, str], current_user: dict = Depends(g
         result = aws_integration.store_encrypted_data(content, key)
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to store data in AWS: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Failed to store data in AWS: {str(e)}",
+            "note": "AWS credentials need to be configured for full functionality",
+            "timestamp": datetime.utcnow().isoformat()
+        }
 
 @app.get("/api/v1/aws/retrieve-data/{key}")
 async def retrieve_data_from_aws(key: str, current_user: dict = Depends(get_current_user)):
@@ -421,7 +426,12 @@ async def retrieve_data_from_aws(key: str, current_user: dict = Depends(get_curr
             "timestamp": datetime.utcnow().isoformat()
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve data from AWS: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Failed to retrieve data from AWS: {str(e)}",
+            "note": "AWS credentials need to be configured for full functionality",
+            "timestamp": datetime.utcnow().isoformat()
+        }
 
 @app.post("/api/v1/aws/send-metrics")
 async def send_aws_metrics(metrics_data: Dict[str, Any], current_user: dict = Depends(get_current_user)):
@@ -435,7 +445,12 @@ async def send_aws_metrics(metrics_data: Dict[str, Any], current_user: dict = De
         result = aws_integration.send_cloudwatch_metrics(namespace, metric_name, value, unit)
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to send metrics to AWS: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Failed to send metrics to AWS: {str(e)}",
+            "note": "AWS credentials need to be configured for full functionality",
+            "timestamp": datetime.utcnow().isoformat()
+        }
 
 @app.get("/api/v1/aws/security-metrics")
 async def get_aws_security_metrics(current_user: dict = Depends(get_current_user)):
@@ -444,7 +459,12 @@ async def get_aws_security_metrics(current_user: dict = Depends(get_current_user
         metrics = aws_integration.get_security_metrics()
         return metrics
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to get security metrics: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Failed to get security metrics: {str(e)}",
+            "note": "AWS credentials need to be configured for full functionality",
+            "timestamp": datetime.utcnow().isoformat()
+        }
 
 # Framework status endpoint
 @app.get("/api/v1/framework/status")
