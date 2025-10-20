@@ -7,7 +7,7 @@ Institution: National College of Ireland
 """
 
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, JSON
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.sql import func
 from datetime import datetime
 
@@ -38,7 +38,7 @@ class SecurityEvent(Base):
     description = Column(Text)
     user_id = Column(String(100))
     ip_address = Column(String(45))
-    metadata = Column(JSON)
+    event_metadata = Column(JSON)
     created_at = Column(DateTime, default=func.now())
 
 class DataClassification(Base):
@@ -50,7 +50,7 @@ class DataClassification(Base):
     sensitivity_level = Column(String(50), nullable=False)
     confidence = Column(String(10), nullable=False)
     classification_method = Column(String(50), nullable=False)
-    metadata = Column(JSON)
+    event_metadata = Column(JSON)
     created_at = Column(DateTime, default=func.now())
 
 class CompliancePolicy(Base):
@@ -91,5 +91,5 @@ class AuditLog(Base):
     resource = Column(String(200))
     ip_address = Column(String(45))
     user_agent = Column(String(500))
-    metadata = Column(JSON)
+    event_metadata = Column(JSON)
     created_at = Column(DateTime, default=func.now())

@@ -18,6 +18,7 @@ import secrets
 import random
 import os
 from dotenv import load_dotenv
+from aws_integration import aws_integration
 
 # Load environment variables
 load_dotenv()
@@ -382,6 +383,69 @@ async def get_automation_status(current_user: dict = Depends(get_current_user)):
         }
     }
 
+# AWS Integration Endpoints
+@app.get("/api/v1/aws/status")
+async def get_aws_status(current_user: dict = Depends(get_current_user)):
+    """Get AWS integration status"""
+    try:
+        aws_status = aws_integration.test_aws_connection()
+        return aws_status
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"AWS connection failed: {str(e)}",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+@app.post("/api/v1/aws/store-data")
+async def store_data_in_aws(data: Dict[str, str], current_user: dict = Depends(get_current_user)):
+    """Store encrypted data in AWS S3"""
+    try:
+        content = data.get("data", "")
+        key = data.get("key", f"data_{secrets.token_urlsafe(16)}")
+        
+        result = aws_integration.store_encrypted_data(content, key)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to store data in AWS: {str(e)}")
+
+@app.get("/api/v1/aws/retrieve-data/{key}")
+async def retrieve_data_from_aws(key: str, current_user: dict = Depends(get_current_user)):
+    """Retrieve encrypted data from AWS S3"""
+    try:
+        data = aws_integration.retrieve_encrypted_data(key)
+        return {
+            "status": "success",
+            "data": data,
+            "key": key,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve data from AWS: {str(e)}")
+
+@app.post("/api/v1/aws/send-metrics")
+async def send_aws_metrics(metrics_data: Dict[str, Any], current_user: dict = Depends(get_current_user)):
+    """Send security metrics to AWS CloudWatch"""
+    try:
+        namespace = metrics_data.get("namespace", "HybridCloudSecurity")
+        metric_name = metrics_data.get("metric_name", "SecurityEvent")
+        value = metrics_data.get("value", 1.0)
+        unit = metrics_data.get("unit", "Count")
+        
+        result = aws_integration.send_cloudwatch_metrics(namespace, metric_name, value, unit)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to send metrics to AWS: {str(e)}")
+
+@app.get("/api/v1/aws/security-metrics")
+async def get_aws_security_metrics(current_user: dict = Depends(get_current_user)):
+    """Get security metrics from AWS CloudWatch"""
+    try:
+        metrics = aws_integration.get_security_metrics()
+        return metrics
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get security metrics: {str(e)}")
+
 # Framework status endpoint
 @app.get("/api/v1/framework/status")
 async def get_framework_status(current_user: dict = Depends(get_current_user)):
@@ -394,7 +458,8 @@ async def get_framework_status(current_user: dict = Depends(get_current_user)):
             "data_protection": {"status": "active", "endpoints": 3},
             "monitoring": {"status": "active", "endpoints": 3},
             "compliance": {"status": "active", "endpoints": 2},
-            "soar": {"status": "active", "endpoints": 3}
+            "soar": {"status": "active", "endpoints": 3},
+            "aws_integration": {"status": "active", "endpoints": 5}
         },
         "security_standards": [
             "SAML 2.0", "OAuth 2.0", "OpenID Connect",
@@ -410,6 +475,12 @@ async def get_framework_status(current_user: dict = Depends(get_current_user)):
             "organizations": 5,
             "sectors": ["Healthcare", "Financial Services", "Government", "Technology", "Manufacturing"],
             "implementation_status": "in_progress"
+        },
+        "aws_integration": {
+            "s3_storage": "active",
+            "cloudwatch_monitoring": "active",
+            "iam_management": "active",
+            "lambda_automation": "active"
         }
     }
 
