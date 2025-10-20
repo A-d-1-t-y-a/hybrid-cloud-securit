@@ -19,6 +19,14 @@ import random
 import os
 from dotenv import load_dotenv
 from aws_integration import aws_integration
+from database import get_db, create_tables
+from models import User, SecurityEvent, DataClassification, CompliancePolicy, SOARWorkflow, AuditLog
+from auth import get_current_user, create_access_token, verify_password, get_password_hash
+from compliance import ComplianceService
+from monitoring import MonitoringService
+from soar import SOARService
+from encryption import encryption_service
+from sqlalchemy.orm import Session
 
 # Load environment variables
 load_dotenv()
@@ -98,34 +106,10 @@ class SOARWorkflow(BaseModel):
     actions: List[str]
     status: str = "active"
 
-# In-memory storage (for demo purposes)
-users_db = {}
-events_db = []
-workflows_db = []
-compliance_data = {
-    "overall_score": 85,
-    "standards": {
-        "GDPR": {"score": 90, "status": "compliant"},
-        "HIPAA": {"score": 85, "status": "compliant"},
-        "SOX": {"score": 88, "status": "compliant"},
-        "ISO27001": {"score": 92, "status": "compliant"},
-        "PCI_DSS": {"score": 87, "status": "compliant"}
-    },
-    "recommendations": [
-        "Enhance data encryption for sensitive information",
-        "Implement additional access controls",
-        "Update security policies regularly"
-    ]
-}
+# Initialize database tables
+create_tables()
 
-# Authentication functions
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """Get current user from token"""
-    token = credentials.credentials
-    # Simple token validation (in production, use proper JWT validation)
-    if token.startswith("token_"):
-        return {"username": "current_user", "role": "admin"}
-    raise HTTPException(status_code=401, detail="Invalid token")
+# Authentication functions - using proper JWT validation from auth.py
 
 # Root endpoint
 @app.get("/")
@@ -157,50 +141,87 @@ async def health_check():
 
 # IAM Endpoints
 @app.post("/api/v1/iam/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def register_user(user_data: UserCreate):
+async def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
     """Register new user"""
-    if user_data.username in users_db:
+    # Check if user already exists
+    existing_user = db.query(User).filter(User.username == user_data.username).first()
+    if existing_user:
         raise HTTPException(status_code=400, detail="Username already registered")
     
-    user_id = len(users_db) + 1
-    user = {
-        "id": user_id,
-        "username": user_data.username,
-        "email": user_data.email,
-        "role": user_data.role,
-        "is_active": True,
-        "created_at": datetime.utcnow().isoformat()
-    }
-    users_db[user_data.username] = user
+    # Create new user
+    hashed_password = get_password_hash(user_data.password)
+    user = User(
+        username=user_data.username,
+        email=user_data.email,
+        password_hash=hashed_password,
+        role=user_data.role,
+        is_active=True
+    )
     
-    return UserResponse(**user)
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    
+    return UserResponse(
+        id=user.id,
+        username=user.username,
+        email=user.email,
+        role=user.role,
+        is_active=user.is_active,
+        created_at=user.created_at.isoformat()
+    )
 
 @app.post("/api/v1/iam/login", response_model=LoginResponse)
-async def login(login_data: LoginRequest):
+async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     """User login"""
-    if login_data.username not in users_db:
+    user = db.query(User).filter(User.username == login_data.username).first()
+    if not user or not verify_password(login_data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    user = users_db[login_data.username]
-    access_token = f"token_{secrets.token_urlsafe(32)}"
+    access_token = create_access_token(data={"sub": user.username, "role": user.role})
     
     return LoginResponse(
         access_token=access_token,
-        user=UserResponse(**user)
+        user=UserResponse(
+            id=user.id,
+            username=user.username,
+            email=user.email,
+            role=user.role,
+            is_active=user.is_active,
+            created_at=user.created_at.isoformat()
+        )
     )
 
 @app.get("/api/v1/iam/users/{user_id}", response_model=UserResponse)
-async def get_user(user_id: int, current_user: dict = Depends(get_current_user)):
+async def get_user(user_id: int, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Get user by ID"""
-    for user in users_db.values():
-        if user["id"] == user_id:
-            return UserResponse(**user)
-    raise HTTPException(status_code=404, detail="User not found")
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return UserResponse(
+        id=user.id,
+        username=user.username,
+        email=user.email,
+        role=user.role,
+        is_active=user.is_active,
+        created_at=user.created_at.isoformat()
+    )
 
 @app.get("/api/v1/iam/users", response_model=List[UserResponse])
-async def get_users(current_user: dict = Depends(get_current_user)):
+async def get_users(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Get all users"""
-    return [UserResponse(**user) for user in users_db.values()]
+    users = db.query(User).all()
+    return [
+        UserResponse(
+            id=user.id,
+            username=user.username,
+            email=user.email,
+            role=user.role,
+            is_active=user.is_active,
+            created_at=user.created_at.isoformat()
+        ) for user in users
+    ]
 
 # Data Protection Endpoints
 @app.post("/api/v1/data-protection/classify", response_model=ClassificationResponse)
@@ -237,7 +258,7 @@ async def classify_data(request: ClassificationRequest, current_user: dict = Dep
 async def encrypt_data(data: Dict[str, str], current_user: dict = Depends(get_current_user)):
     """Encrypt data using AES-256"""
     content = data.get("data", "")
-    encrypted_data = hashlib.sha256(content.encode()).hexdigest()
+    encrypted_data = encryption_service.encrypt_data(content)
     
     return {
         "encrypted_data": encrypted_data,
@@ -249,20 +270,20 @@ async def encrypt_data(data: Dict[str, str], current_user: dict = Depends(get_cu
 async def decrypt_data(data: Dict[str, str], current_user: dict = Depends(get_current_user)):
     """Decrypt data"""
     encrypted_data = data.get("encrypted_data", "")
+    decrypted_data = encryption_service.decrypt_data(encrypted_data)
     
     return {
-        "decrypted_data": "Decrypted content",
+        "decrypted_data": decrypted_data,
         "algorithm": "AES-256",
         "timestamp": datetime.utcnow().isoformat()
     }
 
 # Security Monitoring Endpoints
 @app.post("/api/v1/monitoring/events/ingest")
-async def ingest_event(event_data: SecurityEvent, current_user: dict = Depends(get_current_user)):
+async def ingest_event(event_data: SecurityEvent, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Ingest security event"""
-    event = {
-        "event_id": f"evt_{secrets.token_urlsafe(16)}",
-        "timestamp": datetime.utcnow().isoformat(),
+    monitoring_service = MonitoringService(db)
+    event_dict = {
         "source": event_data.source,
         "event_type": event_data.event_type,
         "severity": event_data.severity,
@@ -270,118 +291,60 @@ async def ingest_event(event_data: SecurityEvent, current_user: dict = Depends(g
         "user_id": event_data.user_id,
         "ip_address": event_data.ip_address
     }
-    events_db.append(event)
     
-    return {
-        "message": "Event ingested successfully",
-        "event_id": event["event_id"],
-        "timestamp": event["timestamp"]
-    }
+    result = monitoring_service.ingest_event(event_dict)
+    return result
 
 @app.get("/api/v1/monitoring/dashboard")
-async def get_security_dashboard(current_user: dict = Depends(get_current_user)):
+async def get_security_dashboard(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Get security dashboard data"""
-    total_events = len(events_db)
-    severity_counts = {"critical": 0, "high": 0, "medium": 0, "low": 0}
-    
-    for event in events_db:
-        severity = event.get("severity", "low")
-        if severity in severity_counts:
-            severity_counts[severity] += 1
-    
-    return {
-        "total_events": total_events,
-        "severity_breakdown": severity_counts,
-        "recent_events_count": min(total_events, 10),
-        "top_event_types": ["authentication", "data_access", "system_change"],
-        "top_sources": ["firewall", "ids", "application"],
-        "threat_indicators_count": random.randint(5, 20),
-        "anomaly_detector_trained": True
-    }
+    monitoring_service = MonitoringService(db)
+    return monitoring_service.get_dashboard_data()
 
 @app.get("/api/v1/monitoring/events")
-async def get_events(limit: int = 100, current_user: dict = Depends(get_current_user)):
+async def get_events(limit: int = 100, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Get security events"""
-    return {
-        "events": events_db[-limit:],
-        "total_count": len(events_db)
-    }
+    monitoring_service = MonitoringService(db)
+    return monitoring_service.get_events(limit)
 
 # Compliance Endpoints
 @app.get("/api/v1/compliance/status", response_model=ComplianceStatus)
-async def get_compliance_status(current_user: dict = Depends(get_current_user)):
+async def get_compliance_status(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Get compliance status"""
-    return ComplianceStatus(**compliance_data)
+    compliance_service = ComplianceService(db)
+    return compliance_service.get_compliance_status()
 
 @app.get("/api/v1/compliance/policies")
-async def get_policies(current_user: dict = Depends(get_current_user)):
+async def get_policies(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Get compliance policies"""
-    policies = [
-        {
-            "policy_id": "policy_1",
-            "name": "Data Protection Policy",
-            "description": "Policy for data protection and privacy",
-            "policy_type": "data_protection",
-            "compliance_standards": ["GDPR", "HIPAA"],
-            "created_at": "2024-01-01T00:00:00Z"
-        },
-        {
-            "policy_id": "policy_2",
-            "name": "Access Control Policy",
-            "description": "Policy for user access control",
-            "policy_type": "access_control",
-            "compliance_standards": ["ISO27001", "SOX"],
-            "created_at": "2024-01-02T00:00:00Z"
-        }
-    ]
-    return {"policies": policies, "total_count": len(policies)}
+    compliance_service = ComplianceService(db)
+    return compliance_service.get_policies()
 
 # SOAR Endpoints
 @app.post("/api/v1/soar/workflows")
-async def create_workflow(workflow_data: SOARWorkflow, current_user: dict = Depends(get_current_user)):
+async def create_workflow(workflow_data: SOARWorkflow, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Create security workflow"""
-    workflow_id = f"workflow_{secrets.token_urlsafe(16)}"
-    workflow = {
-        "workflow_id": workflow_id,
+    soar_service = SOARService(db)
+    workflow_dict = {
         "name": workflow_data.name,
         "description": workflow_data.description,
         "trigger_conditions": workflow_data.trigger_conditions,
         "actions": workflow_data.actions,
-        "status": workflow_data.status,
-        "created_at": datetime.utcnow().isoformat()
+        "status": workflow_data.status
     }
-    workflows_db.append(workflow)
-    
-    return {
-        "message": "Workflow created successfully",
-        "workflow_id": workflow_id
-    }
+    return soar_service.create_workflow(workflow_dict)
 
 @app.get("/api/v1/soar/workflows")
-async def get_workflows(current_user: dict = Depends(get_current_user)):
+async def get_workflows(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Get security workflows"""
-    return {
-        "workflows": workflows_db,
-        "total_count": len(workflows_db)
-    }
+    soar_service = SOARService(db)
+    return soar_service.get_workflows()
 
 @app.get("/api/v1/soar/automation/status")
-async def get_automation_status(current_user: dict = Depends(get_current_user)):
+async def get_automation_status(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Get automation status"""
-    return {
-        "platform_status": "operational",
-        "active_workflows": len(workflows_db),
-        "executed_workflows_today": random.randint(20, 50),
-        "automated_responses": random.randint(100, 200),
-        "threat_intelligence_feeds": 3,
-        "last_automation": datetime.utcnow().isoformat(),
-        "components": {
-            "workflow_engine": "active",
-            "threat_intelligence": "active",
-            "response_automation": "active",
-            "monitoring": "active"
-        }
-    }
+    soar_service = SOARService(db)
+    return soar_service.get_automation_status()
 
 # AWS Integration Endpoints
 @app.get("/api/v1/aws/status")
