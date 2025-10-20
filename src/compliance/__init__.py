@@ -1,3 +1,0 @@
-"""
-Compliance and Governance Component
-"""
