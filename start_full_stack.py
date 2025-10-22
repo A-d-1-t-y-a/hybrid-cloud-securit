@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+import subprocess
+import sys
+import time
+import os
+import signal
+import threading
+from pathlib import Path
+
+def start_security_framework_backend():
+    print("🚀 Starting Hybrid Cloud Security Framework Backend...")
+    backend_process = subprocess.Popen(
+        [sys.executable, "run.py"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
+    )
+    return backend_process
+
+def start_security_framework_frontend():
+    print("🎨 Starting Hybrid Cloud Security Framework Frontend...")
+    frontend_directory = Path("frontend")
+    os.chdir(frontend_directory)
+    
+    frontend_process = subprocess.Popen(
+        [sys.executable, "-m", "streamlit", "run", "app.py", "--server.port", "8501", "--server.address", "0.0.0.0"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True
+    )
+    return frontend_process
+
+def monitor_application_process(process, process_name):
+    while process.poll() is None:
+        time.sleep(1)
+    
+    print(f"❌ {process_name} process ended unexpectedly")
+    return process.returncode
+
+def main():
+    print("🔐 Hybrid Cloud Security Framework - Full Stack Application")
+    print("=" * 80)
+    print("Author: Nithin Bonagiri (X24137430)")
+    print("Supervisor: Prof. Sean Heeney")
+    print("Institution: National College of Ireland")
+    print("=" * 80)
+    
+    security_framework_backend_process = None
+    security_framework_frontend_process = None
+    
+    try:
+        security_framework_backend_process = start_security_framework_backend()
+        print("⏳ Waiting for backend to start...")
+        time.sleep(5)
+        
+        security_framework_frontend_process = start_security_framework_frontend()
+        print("⏳ Waiting for frontend to start...")
+        time.sleep(3)
+        
+        print("\n🎉 Full Stack Application Started Successfully!")
+        print("=" * 80)
+        print("🌐 Frontend (Streamlit): http://localhost:8501")
+        print("🔧 Backend API: http://localhost:8000")
+        print("📚 API Documentation: http://localhost:8000/docs")
+        print("🔍 Alternative Docs: http://localhost:8000/redoc")
+        print("=" * 80)
+        print("Press Ctrl+C to stop both services")
+        print("=" * 80)
+        
+        backend_monitoring_thread = threading.Thread(target=monitor_application_process, args=(security_framework_backend_process, "Backend"))
+        frontend_monitoring_thread = threading.Thread(target=monitor_application_process, args=(security_framework_frontend_process, "Frontend"))
+        
+        backend_monitoring_thread.daemon = True
+        frontend_monitoring_thread.daemon = True
+        
+        backend_monitoring_thread.start()
+        frontend_monitoring_thread.start()
+        
+        while True:
+            time.sleep(1)
+            
+    except KeyboardInterrupt:
+        print("\n🛑 Shutting down services...")
+        
+        if security_framework_frontend_process:
+            print("Stopping frontend...")
+            security_framework_frontend_process.terminate()
+            try:
+                security_framework_frontend_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                security_framework_frontend_process.kill()
+        
+        if security_framework_backend_process:
+            print("Stopping backend...")
+            security_framework_backend_process.terminate()
+            try:
+                security_framework_backend_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                security_framework_backend_process.kill()
+        
+        print("✅ All services stopped successfully!")
+        
+    except Exception as e:
+        print(f"❌ Error starting services: {e}")
+        
+        if security_framework_frontend_process:
+            security_framework_frontend_process.terminate()
+        if security_framework_backend_process:
+            security_framework_backend_process.terminate()
+        
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
