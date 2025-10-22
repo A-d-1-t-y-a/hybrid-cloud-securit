@@ -9,8 +9,15 @@ from pathlib import Path
 
 def start_security_framework_backend():
     print("🚀 Starting Hybrid Cloud Security Framework Backend...")
+    # Activate virtual environment and run backend
+    if os.name == 'nt':  # Windows
+        activate_cmd = "venv\\Scripts\\activate && py run.py"
+    else:  # Unix/Linux/Mac
+        activate_cmd = "source venv/bin/activate && python run.py"
+    
     backend_process = subprocess.Popen(
-        [sys.executable, "run.py"],
+        activate_cmd,
+        shell=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True
@@ -22,8 +29,15 @@ def start_security_framework_frontend():
     frontend_directory = Path("frontend")
     os.chdir(frontend_directory)
     
+    # Activate virtual environment and run frontend
+    if os.name == 'nt':  # Windows
+        activate_cmd = "..\\venv\\Scripts\\activate && py -m streamlit run app.py --server.port 8501 --server.address 0.0.0.0"
+    else:  # Unix/Linux/Mac
+        activate_cmd = "source ../venv/bin/activate && python -m streamlit run app.py --server.port 8501 --server.address 0.0.0.0"
+    
     frontend_process = subprocess.Popen(
-        [sys.executable, "-m", "streamlit", "run", "app.py", "--server.port", "8501", "--server.address", "0.0.0.0"],
+        activate_cmd,
+        shell=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True
