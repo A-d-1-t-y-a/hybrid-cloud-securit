@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
-from services.api_client import APIClient
+from services.api_client import SecurityFrameworkAPIClient
 
-def show_data_classification(api_client: APIClient):
+def show_data_classification(api_client: SecurityFrameworkAPIClient):
     st.title("🔍 Data Classification & Protection")
     
     tab1, tab2, tab3 = st.tabs(["🏷️ Data Classification", "🔐 Encryption Tools", "📊 Data Analytics"])
@@ -25,7 +25,7 @@ def show_data_classification(api_client: APIClient):
             if st.button("🔍 Classify Data", use_container_width=True):
                 if content:
                     with st.spinner("Analyzing data..."):
-                        result = api_client.classify_data(content, {"metadata": metadata} if metadata else None)
+                        result = api_client.classify_sensitive_data(content, {"metadata": metadata} if metadata else None)
                     
                     if result["success"]:
                         classification = result["data"]
@@ -75,7 +75,7 @@ def show_data_classification(api_client: APIClient):
             if st.button("🔐 Encrypt", use_container_width=True):
                 if data_to_encrypt:
                     with st.spinner("Encrypting data..."):
-                        result = api_client.encrypt_data(data_to_encrypt)
+                        result = api_client.encrypt_sensitive_data(data_to_encrypt)
                     
                     if result["success"]:
                         encrypted_data = result["data"]
@@ -152,7 +152,7 @@ def show_data_classification(api_client: APIClient):
         with col4:
             st.metric("Compliance Score", "98.5%")
 
-def show_data_governance(api_client: APIClient):
+def show_data_governance(api_client: SecurityFrameworkAPIClient):
     st.title("📋 Data Governance & Compliance")
     
     tab1, tab2, tab3 = st.tabs(["📊 Data Inventory", "🛡️ Privacy Controls", "📈 Compliance Metrics"])

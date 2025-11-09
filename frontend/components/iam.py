@@ -1,8 +1,8 @@
 import streamlit as st
 import pandas as pd
-from services.api_client import APIClient
+from services.api_client import SecurityFrameworkAPIClient
 
-def show_user_management(api_client: APIClient):
+def show_user_management(api_client: SecurityFrameworkAPIClient):
     st.title("👥 Identity & Access Management")
     
     tab1, tab2, tab3 = st.tabs(["👤 User Management", "🔐 Role Management", "📊 Access Analytics"])
@@ -119,7 +119,7 @@ def show_user_management(api_client: APIClient):
             df_access = pd.DataFrame(access_data)
             st.bar_chart(df_access.set_index("Resource"))
 
-def show_authentication_settings(api_client: APIClient):
+def show_authentication_settings(api_client: SecurityFrameworkAPIClient):
     st.title("🔐 Authentication Settings")
     
     tab1, tab2, tab3 = st.tabs(["🔑 JWT Settings", "🛡️ Security Policies", "📱 MFA Configuration"])

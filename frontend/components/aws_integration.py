@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from services.api_client import APIClient
+from services.api_client import SecurityFrameworkAPIClient
 
-def show_aws_integration(api_client: APIClient):
+def show_aws_integration(api_client: SecurityFrameworkAPIClient):
     st.title("☁️ AWS Cloud Integration")
     
     tab1, tab2, tab3 = st.tabs(["🔧 AWS Services", "📊 Cloud Metrics", "🛡️ Security Controls"])
@@ -11,7 +11,7 @@ def show_aws_integration(api_client: APIClient):
     with tab1:
         st.subheader("AWS Services Status")
         
-        result = api_client.get_aws_status()
+        result = api_client.get_aws_cloud_status()
         if result["success"]:
             aws_status = result["data"]
             st.json(aws_status)
@@ -96,7 +96,7 @@ def show_aws_integration(api_client: APIClient):
             if st.form_submit_button("☁️ Store in AWS S3", use_container_width=True):
                 if data_content and data_key:
                     with st.spinner("Storing data in AWS S3..."):
-                        result = api_client.store_aws_data(data_content, data_key)
+                        result = api_client.store_data_in_aws_s3(data_content, data_key)
                     
                     if result["success"]:
                         st.success("✅ Data stored successfully in AWS S3!")
@@ -114,7 +114,7 @@ def show_aws_integration(api_client: APIClient):
             if st.form_submit_button("📥 Retrieve from AWS S3", use_container_width=True):
                 if retrieve_key:
                     with st.spinner("Retrieving data from AWS S3..."):
-                        result = api_client.retrieve_aws_data(retrieve_key)
+                        result = api_client.retrieve_data_from_aws_s3(retrieve_key)
                     
                     if result["success"]:
                         st.success("✅ Data retrieved successfully!")
@@ -168,7 +168,7 @@ def show_aws_integration(api_client: APIClient):
                 }
                 
                 with st.spinner("Sending metrics to CloudWatch..."):
-                    result = api_client.send_aws_metrics(metrics_data)
+                    result = api_client.send_cloudwatch_metrics(metrics_data)
                 
                 if result["success"]:
                     st.success("✅ Metrics sent successfully to CloudWatch!")
@@ -177,7 +177,7 @@ def show_aws_integration(api_client: APIClient):
         
         st.markdown("---")
         
-        result = api_client.get_aws_security_metrics()
+        result = api_client.get_aws_security_metrics_data()
         if result["success"]:
             st.markdown("**Security Metrics from CloudWatch**")
             metrics_data = result["data"]
@@ -185,7 +185,7 @@ def show_aws_integration(api_client: APIClient):
         else:
             st.error(f"Failed to load security metrics: {result.get('error', 'Unknown error')}")
 
-def show_cloud_analytics(api_client: APIClient):
+def show_cloud_analytics(api_client: SecurityFrameworkAPIClient):
     st.title("📈 Cloud Analytics & Insights")
     
     tab1, tab2, tab3 = st.tabs(["📊 Usage Analytics", "💰 Cost Optimization", "🔍 Performance Monitoring"])

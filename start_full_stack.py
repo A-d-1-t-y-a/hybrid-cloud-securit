@@ -8,12 +8,14 @@ import threading
 from pathlib import Path
 
 def start_security_framework_backend():
-    print("🚀 Starting Hybrid Cloud Security Framework Backend...")
+    print("Starting Hybrid Cloud Security Framework Backend...")
     # Activate virtual environment and run backend
     if os.name == 'nt':  # Windows
         activate_cmd = "venv\\Scripts\\activate && py run.py"
     else:  # Unix/Linux/Mac
         activate_cmd = "source venv/bin/activate && python run.py"
+    
+    print(f"Backend command: {activate_cmd}")
     
     backend_process = subprocess.Popen(
         activate_cmd,
@@ -25,22 +27,23 @@ def start_security_framework_backend():
     return backend_process
 
 def start_security_framework_frontend():
-    print("🎨 Starting Hybrid Cloud Security Framework Frontend...")
-    frontend_directory = Path("frontend")
-    os.chdir(frontend_directory)
+    print("Starting Hybrid Cloud Security Framework Frontend...")
     
-    # Activate virtual environment and run frontend
+    # Don't change directory, run from root with proper path
     if os.name == 'nt':  # Windows
-        activate_cmd = "..\\venv\\Scripts\\activate && py -m streamlit run app.py --server.port 8501 --server.address 0.0.0.0"
+        activate_cmd = "venv\\Scripts\\activate && py -m streamlit run frontend/app.py --server.port 8501 --server.address localhost"
     else:  # Unix/Linux/Mac
-        activate_cmd = "source ../venv/bin/activate && python -m streamlit run app.py --server.port 8501 --server.address 0.0.0.0"
+        activate_cmd = "source venv/bin/activate && python -m streamlit run frontend/app.py --server.port 8501 --server.address localhost"
+    
+    print(f"Frontend command: {activate_cmd}")
     
     frontend_process = subprocess.Popen(
         activate_cmd,
         shell=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True
+        text=True,
+        cwd=os.getcwd()  # Ensure we're in the root directory
     )
     return frontend_process
 
@@ -48,11 +51,11 @@ def monitor_application_process(process, process_name):
     while process.poll() is None:
         time.sleep(1)
     
-    print(f"❌ {process_name} process ended unexpectedly")
+    print(f"{process_name} process ended unexpectedly")
     return process.returncode
 
 def main():
-    print("🔐 Hybrid Cloud Security Framework - Full Stack Application")
+    print("Hybrid Cloud Security Framework - Full Stack Application")
     print("=" * 80)
     print("Author: Nithin Bonagiri (X24137430)")
     print("Supervisor: Prof. Sean Heeney")
@@ -64,21 +67,39 @@ def main():
     
     try:
         security_framework_backend_process = start_security_framework_backend()
-        print("⏳ Waiting for backend to start...")
+        print("Waiting for backend to start...")
         time.sleep(5)
         
-        security_framework_frontend_process = start_security_framework_frontend()
-        print("⏳ Waiting for frontend to start...")
-        time.sleep(3)
+        # Check if backend is still running
+        if security_framework_backend_process.poll() is not None:
+            print("Backend failed to start!")
+            stdout, stderr = security_framework_backend_process.communicate()
+            print(f"Backend stdout: {stdout}")
+            print(f"Backend stderr: {stderr}")
+            return
         
-        print("\n🎉 Full Stack Application Started Successfully!")
+        security_framework_frontend_process = start_security_framework_frontend()
+        print("Waiting for frontend to start...")
+        time.sleep(8)  # Give frontend more time to start
+        
+        # Check if frontend is still running
+        if security_framework_frontend_process.poll() is not None:
+            print("Frontend failed to start!")
+            stdout, stderr = security_framework_frontend_process.communicate()
+            print(f"Frontend stdout: {stdout}")
+            print(f"Frontend stderr: {stderr}")
+            return
+        
+        print("\nFull Stack Application Started Successfully!")
         print("=" * 80)
-        print("🌐 Frontend (Streamlit): http://localhost:8501")
-        print("🔧 Backend API: http://localhost:8000")
-        print("📚 API Documentation: http://localhost:8000/docs")
-        print("🔍 Alternative Docs: http://localhost:8000/redoc")
+        print("Frontend (Streamlit): http://localhost:8501")
+        print("Backend API: http://localhost:8000")
+        print("API Documentation: http://localhost:8000/docs")
+        print("Alternative Docs: http://localhost:8000/redoc")
         print("=" * 80)
         print("Press Ctrl+C to stop both services")
+        print("=" * 80)
+        print("NOTE: Use http://localhost:8501 (not 0.0.0.0) to access the frontend")
         print("=" * 80)
         
         backend_monitoring_thread = threading.Thread(target=monitor_application_process, args=(security_framework_backend_process, "Backend"))
@@ -94,7 +115,7 @@ def main():
             time.sleep(1)
             
     except KeyboardInterrupt:
-        print("\n🛑 Shutting down services...")
+        print("\nShutting down services...")
         
         if security_framework_frontend_process:
             print("Stopping frontend...")
@@ -112,10 +133,10 @@ def main():
             except subprocess.TimeoutExpired:
                 security_framework_backend_process.kill()
         
-        print("✅ All services stopped successfully!")
+        print("All services stopped successfully!")
         
     except Exception as e:
-        print(f"❌ Error starting services: {e}")
+        print(f"Error starting services: {e}")
         
         if security_framework_frontend_process:
             security_framework_frontend_process.terminate()

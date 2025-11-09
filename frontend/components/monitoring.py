@@ -4,9 +4,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import random
-from services.api_client import APIClient
+from services.api_client import SecurityFrameworkAPIClient
 
-def show_security_monitoring(api_client: APIClient):
+def show_security_monitoring(api_client: SecurityFrameworkAPIClient):
     st.title("🔍 Security Monitoring & SIEM")
     
     tab1, tab2, tab3 = st.tabs(["📊 Security Dashboard", "🚨 Event Management", "📈 Analytics & Reports"])
@@ -151,7 +151,7 @@ def show_security_monitoring(api_client: APIClient):
         with col3:
             st.metric("Response Rate", "98.5%", "2.1%")
 
-def show_incident_response(api_client: APIClient):
+def show_incident_response(api_client: SecurityFrameworkAPIClient):
     st.title("🚨 Incident Response & SOAR")
     
     tab1, tab2, tab3 = st.tabs(["🎯 Incident Dashboard", "🤖 Automated Workflows", "📋 Response Playbooks"])

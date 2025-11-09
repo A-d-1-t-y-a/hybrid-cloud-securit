@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from services.api_client import APIClient
+from services.api_client import SecurityFrameworkAPIClient
 
-def show_compliance_management(api_client: APIClient):
+def show_compliance_management(api_client: SecurityFrameworkAPIClient):
     st.title("📋 Compliance & Governance")
     
     tab1, tab2, tab3 = st.tabs(["📊 Compliance Dashboard", "📋 Policy Management", "📈 Audit & Reporting"])
@@ -157,7 +157,7 @@ def show_compliance_management(api_client: APIClient):
                 mime="application/pdf"
             )
 
-def show_risk_management(api_client: APIClient):
+def show_risk_management(api_client: SecurityFrameworkAPIClient):
     st.title("⚠️ Risk Management & Assessment")
     
     tab1, tab2, tab3 = st.tabs(["🎯 Risk Dashboard", "📊 Risk Assessment", "🛡️ Risk Mitigation"])
