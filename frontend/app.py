@@ -13,8 +13,6 @@ from components.monitoring import show_security_monitoring, show_incident_respon
 from components.compliance import show_compliance_management, show_risk_management
 from components.aws_integration import show_aws_integration, show_cloud_analytics
 from components.settings import show_settings
-from utils.session_manager import restore_session_from_query_params, save_session_to_query_params
-
 def main():
     st.set_page_config(
         page_title=SecurityFrameworkConfig.APP_TITLE,
@@ -26,26 +24,17 @@ def main():
     st.markdown(SecurityFrameworkConfig.SIDEBAR_STYLE, unsafe_allow_html=True)
     st.markdown(SecurityFrameworkConfig.MAIN_STYLE, unsafe_allow_html=True)
     
-    # Initialize session state if not exists
+    # Initialize session state
     if 'authentication_token' not in st.session_state:
         st.session_state.authentication_token = None
     if 'current_username' not in st.session_state:
         st.session_state.current_username = None
     if 'user_role' not in st.session_state:
         st.session_state.user_role = None
-    
-    # Restore session from query parameters if available (for browser refresh persistence)
-    restore_session_from_query_params()
+    if 'is_authenticated' not in st.session_state:
+        st.session_state.is_authenticated = False
     
     security_framework_api_client = SecurityFrameworkAPIClient(SecurityFrameworkConfig.API_BASE_URL)
-    
-    # If authenticated, ensure query params are up-to-date for persistence
-    if st.session_state.get('authentication_token'):
-        try:
-            from utils.session_manager import save_session_to_query_params
-            save_session_to_query_params()
-        except Exception:
-            pass
     
     if not check_user_authentication_status():
         st.title(SecurityFrameworkConfig.APP_TITLE)

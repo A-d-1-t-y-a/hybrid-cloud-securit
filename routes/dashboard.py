@@ -1,11 +1,15 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
 from database import get_db
 from models import User, SecurityEvent, CompliancePolicy, SOARWorkflow
 from auth import get_current_user
 from datetime import datetime, timedelta
 from typing import Dict, Any
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["Dashboard"])
 
@@ -66,16 +70,18 @@ async def get_dashboard_metrics(db: Session = Depends(get_db), current_user: dic
                 "label": "Active Workflows"
             }
         }
+    except SQLAlchemyError as e:
+        logger.error(f"Database error fetching dashboard metrics: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch dashboard metrics due to database error"
+        )
     except Exception as e:
-        print(f"Dashboard metrics error: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return {
-            "active_users": {"value": 0, "delta": "0%", "label": "Active Users"},
-            "security_events": {"value": 0, "delta": "0%", "label": "Security Events"},
-            "compliance_score": {"value": 0, "delta": "0%", "label": "Compliance Score"},
-            "active_workflows": {"value": 0, "delta": "0%", "label": "Active Workflows"}
-        }
+        logger.error(f"Error fetching dashboard metrics: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch dashboard metrics: {str(e)}"
+        )
 
 @router.get("/security-timeline")
 async def get_security_timeline(days: int = 30, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
@@ -105,8 +111,18 @@ async def get_security_timeline(days: int = 30, db: Session = Depends(get_db), c
             "timeline": timeline_data,
             "total_events": sum(item["count"] for item in timeline_data)
         }
+    except SQLAlchemyError as e:
+        logger.error(f"Database error fetching security timeline: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch security timeline due to database error"
+        )
     except Exception as e:
-        return {"timeline": [], "total_events": 0}
+        logger.error(f"Error fetching security timeline: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch security timeline: {str(e)}"
+        )
 
 @router.get("/threat-summary")
 async def get_threat_summary(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
@@ -143,12 +159,18 @@ async def get_threat_summary(db: Session = Depends(get_db), current_user: dict =
             "security_score": round(security_score, 1),
             "total_threats": len(threats_list)
         }
+    except SQLAlchemyError as e:
+        logger.error(f"Database error fetching threat summary: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch threat summary due to database error"
+        )
     except Exception as e:
-        return {
-            "threats": [],
-            "security_score": 0,
-            "total_threats": 0
-        }
+        logger.error(f"Error fetching threat summary: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch threat summary: {str(e)}"
+        )
 
 @router.get("/severity-distribution")
 async def get_severity_distribution(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
@@ -170,14 +192,18 @@ async def get_severity_distribution(db: Session = Depends(get_db), current_user:
                 severity_data[level] = 0
         
         return severity_data
+    except SQLAlchemyError as e:
+        logger.error(f"Database error fetching severity distribution: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch severity distribution due to database error"
+        )
     except Exception as e:
-        return {
-            "Critical": 0,
-            "High": 0,
-            "Medium": 0,
-            "Low": 0,
-            "Info": 0
-        }
+        logger.error(f"Error fetching severity distribution: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch severity distribution: {str(e)}"
+        )
 
 @router.get("/event-sources")
 async def get_event_sources(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
@@ -199,5 +225,15 @@ async def get_event_sources(db: Session = Depends(get_db), current_user: dict = 
             })
         
         return {"sources": sources_data}
+    except SQLAlchemyError as e:
+        logger.error(f"Database error fetching event sources: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch event sources due to database error"
+        )
     except Exception as e:
-        return {"sources": []}
+        logger.error(f"Error fetching event sources: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch event sources: {str(e)}"
+        )

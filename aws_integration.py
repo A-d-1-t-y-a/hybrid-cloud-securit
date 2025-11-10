@@ -22,7 +22,18 @@ class AWSIntegration:
     
     def __init__(self):
         """Initialize AWS services"""
+        self.s3_client = None
+        self.cloudwatch_client = None
+        self.iam_client = None
+        self.lambda_client = None
+        self.initialized = False
+        
         try:
+            # Check if AWS credentials are configured
+            if not settings.AWS_ACCESS_KEY_ID or not settings.AWS_SECRET_ACCESS_KEY:
+                logger.warning("AWS credentials not configured. AWS features will be unavailable.")
+                return
+            
             self.s3_client = boto3.client(
                 's3',
                 aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
@@ -47,10 +58,11 @@ class AWSIntegration:
                 aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
                 region_name=settings.AWS_REGION
             )
+            self.initialized = True
             logger.info("AWS services initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize AWS services: {e}")
-            raise
+            self.initialized = False
     
     def store_encrypted_data(self, data: str, key: str) -> Dict[str, Any]:
         """Store encrypted data in S3"""

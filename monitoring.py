@@ -68,6 +68,11 @@ class MonitoringService:
             
             return {
                 "total_events": total_events,
+                "critical_events": severity_counts.get("critical", 0),
+                "high_severity_events": severity_counts.get("high", 0),
+                "medium_severity_events": severity_counts.get("medium", 0),
+                "low_severity_events": severity_counts.get("low", 0),
+                "recent_events": len(recent_events),
                 "severity_breakdown": severity_counts,
                 "recent_events_count": len(recent_events),
                 "top_event_types": ["authentication", "data_access", "system_change"],

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from database import get_db
 from models import User
 from schemas import UserCreate, UserResponse, LoginRequest, LoginResponse
@@ -13,6 +14,10 @@ async def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
     if existing_user:
         raise HTTPException(status_code=400, detail="Username already registered")
     
+    existing_email = db.query(User).filter(User.email == user_data.email).first()
+    if existing_email:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
     hashed_password = get_password_hash(user_data.password)
     user = User(
         username=user_data.username,
@@ -23,7 +28,12 @@ async def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
     )
     
     db.add(user)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        # In case of race condition or direct constraint violation
+        raise HTTPException(status_code=400, detail="User with provided username or email already exists")
     db.refresh(user)
     
     return UserResponse(

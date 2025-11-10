@@ -1,9 +1,6 @@
 import requests
 import streamlit as st
-from typing import Dict, List, Optional, Any
-import json
-from datetime import datetime
-from utils.session_manager import set_query_params
+from typing import Dict, Any
 
 class SecurityFrameworkAPIClient:
     def __init__(self, api_base_url: str):
@@ -20,14 +17,39 @@ class SecurityFrameworkAPIClient:
             if 200 <= response.status_code < 300:
                 # Treat all 2xx as success
                 return {"success": True, "data": response.json()}
-            elif response.status_code == 401:
-                return {"success": False, "error": "Authentication required. Please login again."}
-            elif response.status_code == 403:
+            
+            # Try to extract structured error details from JSON
+            err_detail = None
+            try:
+                err_json = response.json()
+                if isinstance(err_json, dict):
+                    err_detail = err_json.get("detail") or err_json.get("message")
+            except Exception:
+                # Not JSON or parse failed; fall back to text
+                pass
+            
+            if err_detail:
+                # Check for authentication errors and clear session
+                if response.status_code == 401:
+                    self._clear_auth_session()
+                return {"success": False, "error": err_detail}
+            
+            if response.status_code == 401:
+                self._clear_auth_session()
+                return {"success": False, "error": "Session expired. Please login again."}
+            if response.status_code == 403:
                 return {"success": False, "error": "Access forbidden. Insufficient permissions."}
-            else:
-                return {"success": False, "error": f"API Error {response.status_code}: {response.text}"}
+            
+            return {"success": False, "error": f"API Error {response.status_code}: {response.text}"}
         except Exception as e:
             return {"success": False, "error": f"Connection error: {str(e)}"}
+    
+    def _clear_auth_session(self):
+        """Clear authentication session on 401 errors"""
+        auth_keys = ['authentication_token', 'current_username', 'user_role']
+        for key in auth_keys:
+            if key in st.session_state:
+                del st.session_state[key]
     
     def authenticate_user(self, username: str, password: str) -> Dict[str, Any]:
         login_url = f"{self.api_base_url}/api/v1/iam/login"
@@ -40,13 +62,7 @@ class SecurityFrameworkAPIClient:
             st.session_state.current_username = username
             # Role is nested under user in API response
             st.session_state.user_role = result["data"].get("user", {}).get("role", "user")
-            
-            # Save to query parameters for persistence across browser refresh (with cross-version support)
-            set_query_params({
-                'token': result["data"]["access_token"],
-                'username': username,
-                'role': result["data"].get("user", {}).get("role", "user")
-            })
+            st.session_state.is_authenticated = True
         
         return result
     
