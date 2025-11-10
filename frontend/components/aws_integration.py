@@ -1,165 +1,125 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 from services.api_client import SecurityFrameworkAPIClient
 
 def show_aws_integration(api_client: SecurityFrameworkAPIClient):
-    st.title("☁️ AWS Cloud Integration")
+    st.title("AWS Cloud Integration")
     
-    tab1, tab2, tab3 = st.tabs(["🔧 AWS Services", "📊 Cloud Metrics", "🛡️ Security Controls"])
+    # Refresh button
+    if st.button("Refresh", key="refresh_aws", use_container_width=False):
+        st.rerun()
     
-    with tab1:
-        st.subheader("AWS Services Status")
+    st.markdown("---")
+    
+    # AWS Connection Status
+    st.subheader("AWS Connection Status")
+    
+    status_result = api_client.get_aws_cloud_status()
+    
+    if status_result["success"]:
+        status_data = status_result["data"]
         
-        result = api_client.get_aws_cloud_status()
-        if result["success"]:
-            aws_status = result["data"]
-            st.json(aws_status)
-        else:
-            st.error(f"Failed to load AWS status: {result.get('error', 'Unknown error')}")
-        
-        st.markdown("---")
-        
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.metric("S3 Buckets", "12", "2 new")
+            connection_status = status_data.get("status", "Unknown")
+            status_color = "🟢" if connection_status == "connected" else "🔴"
+            st.metric("Connection Status", connection_status.capitalize())
         
         with col2:
-            st.metric("Lambda Functions", "8", "1 new")
+            region = status_data.get("region", "N/A")
+            st.metric("AWS Region", region)
         
         with col3:
-            st.metric("CloudWatch Alarms", "24", "3 new")
-        
-        with col4:
-            st.metric("IAM Users", "45", "5 new")
-        
-        st.markdown("---")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("**S3 Storage Management**")
-            s3_data = {
-                "Bucket": ["security-logs", "backup-data", "compliance-reports", "user-data"],
-                "Size (GB)": [245, 1200, 89, 156],
-                "Objects": [12500, 45000, 2300, 8900],
-                "Encryption": ["Enabled", "Enabled", "Enabled", "Enabled"]
-            }
-            df_s3 = pd.DataFrame(s3_data)
-            st.dataframe(df_s3, use_container_width=True, hide_index=True)
-        
-        with col2:
-            st.markdown("**Lambda Functions**")
-            lambda_data = {
-                "Function": ["Security-Scanner", "Log-Processor", "Alert-Handler", "Backup-Manager"],
-                "Runtime": ["Python 3.9", "Python 3.9", "Node.js 18", "Python 3.9"],
-                "Memory": ["512 MB", "1024 MB", "256 MB", "512 MB"],
-                "Last Invoked": ["2 min ago", "5 min ago", "1 hour ago", "3 hours ago"]
-            }
-            df_lambda = pd.DataFrame(lambda_data)
-            st.dataframe(df_lambda, use_container_width=True, hide_index=True)
+            account = status_data.get("account_id", "N/A")
+            if account and len(account) > 8:
+                account = f"***{account[-4:]}"
+            st.metric("Account ID", account)
+    else:
+        st.error(f"Failed to connect to AWS: {status_result.get('error', 'Unknown error')}")
     
-    with tab2:
-        st.subheader("Cloud Metrics & Monitoring")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("**CloudWatch Metrics**")
-            metrics_data = {
-                "Metric": ["CPU Utilization", "Memory Usage", "Network I/O", "Disk I/O"],
-                "Value": ["45%", "67%", "125 MB/s", "89 MB/s"],
-                "Status": ["Normal", "Warning", "Normal", "Normal"],
-                "Trend": ["↗️", "↘️", "→", "↗️"]
-            }
-            df_metrics = pd.DataFrame(metrics_data)
-            st.dataframe(df_metrics, use_container_width=True, hide_index=True)
-        
-        with col2:
-            st.markdown("**Cost Analysis**")
-            cost_data = {
-                "Service": ["EC2", "S3", "Lambda", "CloudWatch", "RDS"],
-                "Monthly Cost": ["$245", "$89", "$34", "$12", "$156"],
-                "Usage": ["High", "Medium", "Low", "Low", "Medium"]
-            }
-            df_cost = pd.DataFrame(cost_data)
-            st.dataframe(df_cost, use_container_width=True, hide_index=True)
-        
-        st.markdown("---")
-        
-        st.markdown("**AWS Data Storage**")
-        with st.form("aws_storage_form"):
-            data_content = st.text_area("Data to store in S3:", placeholder="Enter data to store in AWS S3...")
-            data_key = st.text_input("S3 Key:", placeholder="my-data-key")
-            
-            if st.form_submit_button("☁️ Store in AWS S3", use_container_width=True):
-                if data_content and data_key:
-                    with st.spinner("Storing data in AWS S3..."):
-                        result = api_client.store_data_in_aws_s3(data_content, data_key)
-                    
-                    if result["success"]:
-                        st.success("✅ Data stored successfully in AWS S3!")
-                    else:
-                        st.error(f"Failed to store data: {result.get('error', 'Unknown error')}")
-                else:
-                    st.error("Please provide both data content and S3 key")
-        
-        st.markdown("---")
-        
-        st.markdown("**Retrieve Data from AWS**")
-        with st.form("aws_retrieve_form"):
-            retrieve_key = st.text_input("S3 Key to retrieve:", placeholder="my-data-key")
-            
-            if st.form_submit_button("📥 Retrieve from AWS S3", use_container_width=True):
-                if retrieve_key:
-                    with st.spinner("Retrieving data from AWS S3..."):
-                        result = api_client.retrieve_data_from_aws_s3(retrieve_key)
-                    
-                    if result["success"]:
-                        st.success("✅ Data retrieved successfully!")
-                        st.text_area("Retrieved Data:", result["data"], height=100, disabled=True)
-                    else:
-                        st.error(f"Failed to retrieve data: {result.get('error', 'Unknown error')}")
-                else:
-                    st.error("Please provide S3 key to retrieve")
+    st.markdown("---")
     
-    with tab3:
-        st.subheader("AWS Security Controls")
+    # S3 Data Storage
+    st.subheader("S3 Data Storage")
+    
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        st.markdown("**Store Data in S3**")
         
-        col1, col2 = st.columns(2)
+        with st.form("store_s3_form"):
+            data_content = st.text_area(
+                "Data to store:",
+                placeholder="Enter data to store in AWS S3...",
+                height=100
+            )
+            data_key = st.text_input(
+                "S3 Key:",
+                placeholder="e.g., security-logs/2024/event.json"
+            )
+            
+            col_a, col_b = st.columns(2)
+            with col_a:
+                if st.form_submit_button("Store in S3", use_container_width=True):
+                    if data_content and data_key:
+                        with st.spinner("Storing data in AWS S3..."):
+                            result = api_client.store_data_in_aws_s3(data_content, data_key)
+                        
+                        if result["success"]:
+                            st.success("Data stored successfully in AWS S3!")
+                            st.info(f"Key: {data_key}")
+                        else:
+                            st.error(f"Error: {result.get('error', 'Failed to store data')}")
+                    else:
+                        st.error("Please provide both data content and S3 key")
+    
+    with col2:
+        st.markdown("**Retrieve Data from S3**")
         
-        with col1:
-            st.markdown("**Security Groups**")
-            sg_data = {
-                "Group": ["Web-SG", "DB-SG", "Admin-SG", "API-SG"],
-                "Rules": [8, 4, 12, 6],
-                "Status": ["Active", "Active", "Active", "Active"],
-                "Last Modified": ["2 days ago", "1 week ago", "3 days ago", "5 days ago"]
-            }
-            df_sg = pd.DataFrame(sg_data)
-            st.dataframe(df_sg, use_container_width=True, hide_index=True)
+        with st.form("retrieve_s3_form"):
+            retrieve_key = st.text_input(
+                "S3 Key to retrieve:",
+                placeholder="e.g., security-logs/2024/event.json"
+            )
+            
+            st.text("")  # Spacer to align with left column
+            st.text("")
+            
+            col_a, col_b = st.columns(2)
+            with col_a:
+                if st.form_submit_button("Retrieve from S3", use_container_width=True):
+                    if retrieve_key:
+                        with st.spinner("Retrieving data from AWS S3..."):
+                            result = api_client.retrieve_data_from_aws_s3(retrieve_key)
+                        
+                        if result["success"]:
+                            st.success("Data retrieved successfully!")
+                            st.code(result["data"], language="text")
+                        else:
+                            st.error(f"Error: {result.get('error', 'Failed to retrieve data')}")
+                    else:
+                        st.error("Please provide S3 key to retrieve")
+    
+    st.markdown("---")
+    
+    # CloudWatch Metrics
+    st.subheader("CloudWatch Metrics")
+    
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        st.markdown("**Send Metrics to CloudWatch**")
         
-        with col2:
-            st.markdown("**IAM Policies**")
-            iam_data = {
-                "Policy": ["S3-ReadOnly", "EC2-FullAccess", "CloudWatch-Logs", "Lambda-Execute"],
-                "Users": [15, 3, 8, 5],
-                "Status": ["Active", "Active", "Active", "Active"]
-            }
-            df_iam = pd.DataFrame(iam_data)
-            st.dataframe(df_iam, use_container_width=True, hide_index=True)
-        
-        st.markdown("---")
-        
-        st.markdown("**Send Security Metrics to CloudWatch**")
-        with st.form("cloudwatch_metrics_form"):
+        with st.form("cloudwatch_form"):
             namespace = st.text_input("Namespace:", value="HybridCloudSecurity")
             metric_name = st.text_input("Metric Name:", value="SecurityEvent")
-            metric_value = st.number_input("Metric Value:", value=1.0)
-            unit = st.selectbox("Unit:", ["Count", "Percent", "Seconds", "Bytes"])
+            metric_value = st.number_input("Metric Value:", value=1.0, min_value=0.0)
+            unit = st.selectbox("Unit:", ["Count", "Percent", "Seconds", "Bytes", "Megabytes"])
             
-            if st.form_submit_button("📊 Send to CloudWatch", use_container_width=True):
+            if st.form_submit_button("Send to CloudWatch", use_container_width=True):
                 metrics_data = {
                     "namespace": namespace,
                     "metric_name": metric_name,
@@ -171,103 +131,166 @@ def show_aws_integration(api_client: SecurityFrameworkAPIClient):
                     result = api_client.send_cloudwatch_metrics(metrics_data)
                 
                 if result["success"]:
-                    st.success("✅ Metrics sent successfully to CloudWatch!")
+                    st.success("Metrics sent successfully to CloudWatch!")
+                    st.info(f"Namespace: {namespace} | Metric: {metric_name}")
                 else:
-                    st.error(f"Failed to send metrics: {result.get('error', 'Unknown error')}")
+                    st.error(f"Error: {result.get('error', 'Failed to send metrics')}")
+    
+    with col2:
+        st.markdown("**CloudWatch Security Metrics**")
         
-        st.markdown("---")
+        metrics_result = api_client.get_aws_security_metrics_data()
         
-        result = api_client.get_aws_security_metrics_data()
-        if result["success"]:
-            st.markdown("**Security Metrics from CloudWatch**")
-            metrics_data = result["data"]
-            st.json(metrics_data)
+        if metrics_result["success"]:
+            metrics_data = metrics_result["data"]
+            
+            if isinstance(metrics_data, dict) and metrics_data:
+                # Display metrics as cards
+                for metric_name, metric_value in metrics_data.items():
+                    st.metric(metric_name.replace("_", " ").title(), metric_value)
+            elif isinstance(metrics_data, list) and len(metrics_data) > 0:
+                # Display as table
+                df_metrics = pd.DataFrame(metrics_data)
+                st.dataframe(df_metrics, use_container_width=True, hide_index=True)
+            else:
+                st.info("No CloudWatch metrics available")
         else:
-            st.error(f"Failed to load security metrics: {result.get('error', 'Unknown error')}")
+            st.info("No security metrics available from CloudWatch")
+
 
 def show_cloud_analytics(api_client: SecurityFrameworkAPIClient):
-    st.title("📈 Cloud Analytics & Insights")
+    st.title("Cloud Analytics & Insights")
     
-    tab1, tab2, tab3 = st.tabs(["📊 Usage Analytics", "💰 Cost Optimization", "🔍 Performance Monitoring"])
+    # Refresh button
+    if st.button("Refresh", key="refresh_analytics", use_container_width=False):
+        st.rerun()
     
-    with tab1:
-        st.subheader("AWS Usage Analytics")
+    st.markdown("---")
+    
+    # AWS Status Overview
+    st.subheader("AWS Service Overview")
+    
+    status_result = api_client.get_aws_cloud_status()
+    
+    if status_result["success"]:
+        status_data = status_result["data"]
         
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            st.metric("Total Requests", "1,234,567", "12%")
+            st.metric("Connection", status_data.get("status", "Unknown").capitalize())
         
         with col2:
-            st.metric("Data Transfer", "2.4 TB", "8%")
+            st.metric("Region", status_data.get("region", "N/A"))
         
         with col3:
-            st.metric("API Calls", "45,678", "15%")
+            services = status_data.get("services", {})
+            active_services = sum(1 for s in services.values() if s == "available")
+            st.metric("Active Services", active_services)
+        
+        with col4:
+            st.metric("Integration", "Enabled")
         
         st.markdown("---")
         
-        usage_data = {
-            "Service": ["S3", "Lambda", "CloudWatch", "IAM", "EC2"],
-            "Requests": [45678, 12345, 8901, 5678, 2345],
-            "Data (GB)": [1200, 45, 12, 0, 89],
-            "Cost ($)": [89, 34, 12, 0, 156]
+        # Service Status Details
+        if "services" in status_data and status_data["services"]:
+            st.markdown("**AWS Services Status**")
+            
+            services_data = []
+            for service_name, service_status in status_data["services"].items():
+                services_data.append({
+                    "Service": service_name.upper(),
+                    "Status": service_status.capitalize(),
+                    "Health": "Healthy" if service_status == "available" else "Unavailable"
+                })
+            
+            df_services = pd.DataFrame(services_data)
+            st.dataframe(df_services, use_container_width=True, hide_index=True)
+    else:
+        st.warning("Unable to load AWS analytics data")
+    
+    st.markdown("---")
+    
+    # Security Metrics from CloudWatch
+    st.subheader("Security Metrics Analytics")
+    
+    metrics_result = api_client.get_aws_security_metrics_data()
+    
+    if metrics_result["success"]:
+        metrics_data = metrics_result["data"]
+        
+        if isinstance(metrics_data, dict) and metrics_data:
+            # Create metrics visualization
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("**Security Metrics Summary**")
+                
+                metrics_list = []
+                for metric_name, metric_value in metrics_data.items():
+                    metrics_list.append({
+                        "Metric": metric_name.replace("_", " ").title(),
+                        "Value": metric_value
+                    })
+                
+                if metrics_list:
+                    df_metrics = pd.DataFrame(metrics_list)
+                    st.dataframe(df_metrics, use_container_width=True, hide_index=True)
+            
+            with col2:
+                st.markdown("**Metrics Visualization**")
+                
+                if len(metrics_data) > 0:
+                    # Create bar chart
+                    df_chart = pd.DataFrame([
+                        {"Metric": k.replace("_", " ").title(), "Value": v} 
+                        for k, v in metrics_data.items()
+                    ])
+                    
+                    fig = px.bar(df_chart, x="Metric", y="Value",
+                                color="Value",
+                                color_continuous_scale="Blues")
+                    fig.update_layout(
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        font_color='white',
+                        showlegend=False
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No security metrics data available from CloudWatch")
+    else:
+        st.info("Security metrics unavailable")
+    
+    st.markdown("---")
+    
+    # Integration Summary
+    st.subheader("Integration Summary")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**Available Features**")
+        features = [
+            "S3 Data Storage & Retrieval",
+            "CloudWatch Metrics Integration",
+            "Security Event Monitoring",
+            "Encrypted Data Storage",
+            "Real-time Metrics Tracking"
+        ]
+        
+        for feature in features:
+            st.markdown(f"- {feature}")
+    
+    with col2:
+        st.markdown("**Integration Status**")
+        
+        integration_status = {
+            "Component": ["S3 Storage", "CloudWatch", "IAM", "Encryption"],
+            "Status": ["Active", "Active", "Active", "Active"],
+            "Health": ["Healthy", "Healthy", "Healthy", "Healthy"]
         }
         
-        df_usage = pd.DataFrame(usage_data)
-        st.dataframe(df_usage, use_container_width=True, hide_index=True)
-    
-    with tab2:
-        st.subheader("Cost Optimization")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("**Cost Breakdown**")
-            cost_breakdown = {
-                "Service": ["EC2", "S3", "Lambda", "CloudWatch", "RDS"],
-                "Cost": [245, 89, 34, 12, 156],
-                "Percentage": [45, 16, 6, 2, 29]
-            }
-            df_cost = pd.DataFrame(cost_breakdown)
-            
-            fig = px.pie(df_cost, values="Cost", names="Service", title="Cost Distribution")
-            st.plotly_chart(fig, use_container_width=True)
-        
-        with col2:
-            st.markdown("**Optimization Recommendations**")
-            recommendations = [
-                "💡 Consider Reserved Instances for EC2",
-                "💡 Enable S3 Intelligent Tiering",
-                "💡 Optimize Lambda memory allocation",
-                "💡 Use CloudWatch Logs retention policies",
-                "💡 Review RDS instance sizes"
-            ]
-            
-            for rec in recommendations:
-                st.markdown(rec)
-    
-    with tab3:
-        st.subheader("Performance Monitoring")
-        
-        performance_data = {
-            "Metric": ["Response Time", "Throughput", "Error Rate", "Availability"],
-            "Current": ["2.3s", "1,200 req/s", "0.1%", "99.9%"],
-            "Target": ["<2s", ">1,000 req/s", "<0.5%", ">99.5%"],
-            "Status": ["⚠️", "✅", "✅", "✅"]
-        }
-        
-        df_performance = pd.DataFrame(performance_data)
-        st.dataframe(df_performance, use_container_width=True, hide_index=True)
-        
-        st.markdown("---")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.metric("Avg Response Time", "2.3s", "-0.2s")
-        
-        with col2:
-            st.metric("Error Rate", "0.1%", "-0.05%")
-        
-        with col3:
-            st.metric("Uptime", "99.9%", "0.1%")
+        df_integration = pd.DataFrame(integration_status)
+        st.dataframe(df_integration, use_container_width=True, hide_index=True)

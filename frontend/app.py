@@ -86,18 +86,20 @@ def main():
             show_incident_response(security_framework_api_client)
         
         elif selected_page == "📋 Compliance":
-            tab1, tab2 = st.tabs(["📊 Compliance Dashboard", "⚠️ Risk Management"])
-            with tab1:
-                show_compliance_management(security_framework_api_client)
-            with tab2:
-                show_risk_management(security_framework_api_client)
+            show_compliance_management(security_framework_api_client)
+            
+            st.markdown("---")
+            st.markdown("---")
+            
+            show_risk_management(security_framework_api_client)
         
         elif selected_page == "☁️ AWS Integration":
-            tab1, tab2 = st.tabs(["🔧 AWS Services", "📈 Cloud Analytics"])
-            with tab1:
-                show_aws_integration(security_framework_api_client)
-            with tab2:
-                show_cloud_analytics(security_framework_api_client)
+            show_aws_integration(security_framework_api_client)
+            
+            st.markdown("---")
+            st.markdown("---")
+            
+            show_cloud_analytics(security_framework_api_client)
         
         elif selected_page == "⚙️ Settings":
             st.title("⚙️ System Settings")
