@@ -6,7 +6,7 @@ load_dotenv()
 class SecurityFrameworkConfig:
     API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
     APP_TITLE = "Hybrid Cloud Security Framework"
-    APP_ICON = "🔐"
+    APP_ICON = ""
     LAYOUT = "wide"
     THEME = "dark"
     

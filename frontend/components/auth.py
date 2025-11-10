@@ -3,7 +3,7 @@ from services.api_client import SecurityFrameworkAPIClient
 from config import SecurityFrameworkConfig
 
 def display_user_authentication_form(api_client: SecurityFrameworkAPIClient):
-    st.markdown("### 🔐 Login to Hybrid Cloud Security Framework")
+    st.markdown("### Login to Hybrid Cloud Security Framework")
     
     with st.form("login_form"):
         username = st.text_input("Username", placeholder="Enter your username")
@@ -16,15 +16,15 @@ def display_user_authentication_form(api_client: SecurityFrameworkAPIClient):
                     authentication_result = api_client.authenticate_user(username, password)
                     
                 if authentication_result["success"]:
-                    st.success("✅ Login successful!")
+                    st.success("Login successful!")
                     st.rerun()
                 else:
-                    st.error(f"❌ Login failed: {authentication_result.get('error', 'Unknown error')}")
+                    st.error(f"Login failed: {authentication_result.get('error', 'Unknown error')}")
             else:
                 st.error("Please fill in all fields")
     
     st.markdown("---")
-    st.markdown("### 📝 New User? Register Here")
+    st.markdown("### New User? Register Here")
     
     with st.form("register_form"):
         reg_username = st.text_input("New Username", key="reg_username")
@@ -39,14 +39,14 @@ def display_user_authentication_form(api_client: SecurityFrameworkAPIClient):
                     registration_result = api_client.register_new_user(reg_username, reg_email, reg_password, reg_role)
                     
                 if registration_result["success"]:
-                    st.success("✅ Registration successful! Please login.")
+                    st.success("Registration successful! Please login.")
                 else:
-                    st.error(f"❌ Registration failed: {registration_result.get('error', 'Unknown error')}")
+                    st.error(f"Registration failed: {registration_result.get('error', 'Unknown error')}")
             else:
                 st.error("Please fill in all fields")
 
 def display_user_logout_button():
-    if st.button("🚪 Logout", use_container_width=True):
+    if st.button("Logout", use_container_width=True):
         for session_key in list(st.session_state.keys()):
             del st.session_state[session_key]
         st.rerun()

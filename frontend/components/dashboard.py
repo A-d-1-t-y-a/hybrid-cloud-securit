@@ -14,28 +14,28 @@ def create_metrics_cards(api_client):
         
         with col1:
             st.metric(
-                label=f"🔐 {metrics['active_users']['label']}",
+                label=metrics['active_users']['label'],
                 value=metrics['active_users']['value'],
                 delta=metrics['active_users']['delta']
             )
         
         with col2:
             st.metric(
-                label=f"🛡️ {metrics['security_events']['label']}",
+                label=metrics['security_events']['label'],
                 value=metrics['security_events']['value'],
                 delta=metrics['security_events']['delta']
             )
         
         with col3:
             st.metric(
-                label=f"📊 {metrics['compliance_score']['label']}",
+                label=metrics['compliance_score']['label'],
                 value=f"{metrics['compliance_score']['value']}%",
                 delta=metrics['compliance_score']['delta']
             )
         
         with col4:
             st.metric(
-                label=f"⚙️ {metrics['active_workflows']['label']}",
+                label=metrics['active_workflows']['label'],
                 value=metrics['active_workflows']['value'],
                 delta=metrics['active_workflows']['delta']
             )
@@ -44,7 +44,7 @@ def create_metrics_cards(api_client):
 
 def create_security_chart(api_client):
     """Create dynamic security events timeline from real data"""
-    st.subheader("🔒 Security Events Timeline")
+    st.subheader("Security Events Timeline")
     
     result = api_client.get_security_timeline(days=30)
     
@@ -70,7 +70,7 @@ def create_security_chart(api_client):
 
 def create_compliance_chart(api_client):
     """Create dynamic compliance status chart from real data"""
-    st.subheader("📋 Compliance Status")
+    st.subheader("Compliance Status")
     
     result = api_client.get_compliance_status_overview()
     
@@ -107,7 +107,7 @@ def create_compliance_chart(api_client):
 
 def create_threat_intelligence(api_client):
     """Create dynamic threat intelligence from real data"""
-    st.subheader("🎯 Threat Intelligence")
+    st.subheader("Threat Intelligence")
     
     result = api_client.get_threat_summary()
     
@@ -132,17 +132,17 @@ def create_threat_intelligence(api_client):
             st.markdown(f"**Overall Security Score: {score}%**")
             
             if score >= 90:
-                st.success("🟢 Excellent security posture")
+                st.success("Excellent security posture")
             elif score >= 70:
-                st.warning("🟡 Good security posture")
+                st.warning("Good security posture")
             else:
-                st.error("🔴 Security improvements needed")
+                st.error("Security improvements needed")
         else:
             st.info("Security score unavailable")
 
 def create_event_sources(api_client):
     """Create dynamic event sources chart from real data"""
-    st.subheader("📊 Top Event Sources")
+    st.subheader("Top Event Sources")
     
     result = api_client.get_event_sources()
     
@@ -165,10 +165,10 @@ def create_event_sources(api_client):
 
 def show_dashboard(api_client):
     """Main dashboard with dynamic data from backend"""
-    st.title("🏠 Security Dashboard")
+    st.title("Security Dashboard")
     
     # Refresh button
-    if st.button("🔄 Refresh Dashboard", use_container_width=False):
+    if st.button("Refresh Dashboard", key="refresh_dashboard", use_container_width=False):
         st.rerun()
     
     create_metrics_cards(api_client)
