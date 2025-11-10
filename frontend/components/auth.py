@@ -1,6 +1,7 @@
 import streamlit as st
 from services.api_client import SecurityFrameworkAPIClient
 from config import SecurityFrameworkConfig
+from utils.session_manager import restore_session_from_query_params
 
 def display_user_authentication_form(api_client: SecurityFrameworkAPIClient):
     st.markdown("### Login to Hybrid Cloud Security Framework")
@@ -47,9 +48,28 @@ def display_user_authentication_form(api_client: SecurityFrameworkAPIClient):
 
 def display_user_logout_button():
     if st.button("Logout", use_container_width=True):
+        # Clear session state
         for session_key in list(st.session_state.keys()):
             del st.session_state[session_key]
+        
+        # Clear query parameters
+        try:
+            st.query_params.clear()
+        except:
+            pass
+        
         st.rerun()
 
 def check_user_authentication_status():
-    return 'authentication_token' in st.session_state and st.session_state.authentication_token is not None
+    # If token exists in session, user is authenticated
+    if 'authentication_token' in st.session_state and st.session_state.authentication_token:
+        return True
+    
+    # Attempt to restore from URL query parameters (works after browser refresh)
+    try:
+        if restore_session_from_query_params():
+            return 'authentication_token' in st.session_state and st.session_state.authentication_token is not None
+    except Exception:
+        pass
+    
+    return False

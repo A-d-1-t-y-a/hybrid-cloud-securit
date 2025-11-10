@@ -3,6 +3,7 @@ import streamlit as st
 from typing import Dict, List, Optional, Any
 import json
 from datetime import datetime
+from utils.session_manager import set_query_params
 
 class SecurityFrameworkAPIClient:
     def __init__(self, api_base_url: str):
@@ -39,6 +40,13 @@ class SecurityFrameworkAPIClient:
             st.session_state.current_username = username
             # Role is nested under user in API response
             st.session_state.user_role = result["data"].get("user", {}).get("role", "user")
+            
+            # Save to query parameters for persistence across browser refresh (with cross-version support)
+            set_query_params({
+                'token': result["data"]["access_token"],
+                'username': username,
+                'role': result["data"].get("user", {}).get("role", "user")
+            })
         
         return result
     

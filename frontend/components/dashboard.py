@@ -169,7 +169,8 @@ def show_dashboard(api_client):
     
     # Refresh button
     if st.button("Refresh Dashboard", key="refresh_dashboard", use_container_width=False):
-        st.rerun()
+        # Just re-render, no need to rerun
+        pass
     
     create_metrics_cards(api_client)
     
