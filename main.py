@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 from dotenv import load_dotenv
 from database import create_tables
-from routes import iam, data_protection, monitoring, compliance, soar, aws
+from routes import iam, data_protection, monitoring, compliance, soar, aws, dashboard
 from auth import get_current_user
 
 load_dotenv()
@@ -32,6 +32,7 @@ app.include_router(monitoring.router)
 app.include_router(compliance.router)
 app.include_router(soar.router)
 app.include_router(aws.router)
+app.include_router(dashboard.router)
 
 @app.get("/")
 async def root():

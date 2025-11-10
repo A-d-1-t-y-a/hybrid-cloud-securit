@@ -146,3 +146,28 @@ class SecurityFrameworkAPIClient:
         health_check_url = f"{self.api_base_url}/health"
         response = self.http_session.get(health_check_url)
         return self._process_api_response(response)
+    
+    def get_dashboard_metrics(self) -> Dict[str, Any]:
+        metrics_url = f"{self.api_base_url}/api/v1/dashboard/metrics"
+        response = self.http_session.get(metrics_url, headers=self._get_authentication_headers())
+        return self._process_api_response(response)
+    
+    def get_security_timeline(self, days: int = 30) -> Dict[str, Any]:
+        timeline_url = f"{self.api_base_url}/api/v1/dashboard/security-timeline?days={days}"
+        response = self.http_session.get(timeline_url, headers=self._get_authentication_headers())
+        return self._process_api_response(response)
+    
+    def get_threat_summary(self) -> Dict[str, Any]:
+        threat_url = f"{self.api_base_url}/api/v1/dashboard/threat-summary"
+        response = self.http_session.get(threat_url, headers=self._get_authentication_headers())
+        return self._process_api_response(response)
+    
+    def get_severity_distribution(self) -> Dict[str, Any]:
+        severity_url = f"{self.api_base_url}/api/v1/dashboard/severity-distribution"
+        response = self.http_session.get(severity_url, headers=self._get_authentication_headers())
+        return self._process_api_response(response)
+    
+    def get_event_sources(self) -> Dict[str, Any]:
+        sources_url = f"{self.api_base_url}/api/v1/dashboard/event-sources"
+        response = self.http_session.get(sources_url, headers=self._get_authentication_headers())
+        return self._process_api_response(response)
