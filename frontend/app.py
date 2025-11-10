@@ -7,8 +7,8 @@ from config import SecurityFrameworkConfig
 from services.api_client import SecurityFrameworkAPIClient
 from components.auth import display_user_authentication_form, display_user_logout_button, check_user_authentication_status
 from components.dashboard import show_dashboard
-from components.iam import show_user_management, show_authentication_settings
-from components.data_protection import show_data_classification, show_data_governance
+from components.iam import show_user_management
+from components.data_protection import show_data_classification
 from components.monitoring import show_security_monitoring, show_incident_response
 from components.compliance import show_compliance_management, show_risk_management
 from components.aws_integration import show_aws_integration, show_cloud_analytics
@@ -72,25 +72,18 @@ def main():
             show_dashboard(security_framework_api_client)
         
         elif selected_page == "👥 Identity & Access":
-            tab1, tab2 = st.tabs(["👤 User Management", "🔐 Authentication"])
-            with tab1:
-                show_user_management(security_framework_api_client)
-            with tab2:
-                show_authentication_settings(security_framework_api_client)
+            show_user_management(security_framework_api_client)
         
         elif selected_page == "🔍 Data Protection":
-            tab1, tab2 = st.tabs(["🔍 Classification & Encryption", "📋 Data Governance"])
-            with tab1:
-                show_data_classification(security_framework_api_client)
-            with tab2:
-                show_data_governance(security_framework_api_client)
+            show_data_classification(security_framework_api_client)
         
         elif selected_page == "🔍 Security Monitoring":
-            tab1, tab2 = st.tabs(["📊 Security Dashboard", "🚨 Incident Response"])
-            with tab1:
-                show_security_monitoring(security_framework_api_client)
-            with tab2:
-                show_incident_response(security_framework_api_client)
+            show_security_monitoring(security_framework_api_client)
+            
+            st.markdown("---")
+            st.markdown("---")
+            
+            show_incident_response(security_framework_api_client)
         
         elif selected_page == "📋 Compliance":
             tab1, tab2 = st.tabs(["📊 Compliance Dashboard", "⚠️ Risk Management"])

@@ -270,50 +270,112 @@ def show_risk_management(api_client: SecurityFrameworkAPIClient):
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("**Risk Categories**")
-            categories_data = {
-                "Category": ["Technical", "Operational", "Compliance", "Financial", "Reputational"],
-                "Count": [15, 12, 8, 6, 4],
-                "High Risk": [3, 2, 1, 1, 1]
-            }
-            df_categories = pd.DataFrame(categories_data)
-            st.dataframe(df_categories, use_container_width=True, hide_index=True)
+            st.markdown("**Risk Categories by Severity**")
+            
+            # Get severity distribution as risk categories
+            severity_result = api_client.get_severity_distribution()
+            
+            if severity_result["success"]:
+                severity_data = severity_result["data"]
+                
+                categories = []
+                for severity, count in severity_data.items():
+                    if count > 0:
+                        categories.append({
+                            "Severity": severity,
+                            "Count": count,
+                            "Risk Level": "High" if severity in ["Critical", "High"] else "Medium" if severity == "Medium" else "Low"
+                        })
+                
+                if categories:
+                    df_categories = pd.DataFrame(categories)
+                    st.dataframe(df_categories, use_container_width=True, hide_index=True)
+                else:
+                    st.info("No risk data available")
+            else:
+                st.info("Risk assessment data unavailable")
         
         with col2:
-            st.markdown("**Risk Heat Map**")
-            heatmap_data = {
-                "Impact": ["Low", "Medium", "High", "Critical"],
-                "Low": [8, 0, 0, 0],
-                "Medium": [12, 6, 2, 0],
-                "High": [5, 4, 3, 1],
-                "Critical": [1, 2, 1, 1]
-            }
-            df_heatmap = pd.DataFrame(heatmap_data)
-            st.dataframe(df_heatmap, use_container_width=True, hide_index=True)
+            st.markdown("**Risk Summary**")
+            
+            # Calculate risk summary from events
+            events_result = api_client.get_security_events()
+            severity_result = api_client.get_severity_distribution()
+            
+            if severity_result["success"]:
+                severity_data = severity_result["data"]
+                
+                summary = {
+                    "Metric": ["Total Risks", "Critical Risks", "High Risks", "Medium Risks", "Low Risks"],
+                    "Count": [
+                        sum(severity_data.values()),
+                        severity_data.get("Critical", 0),
+                        severity_data.get("High", 0),
+                        severity_data.get("Medium", 0),
+                        severity_data.get("Low", 0) + severity_data.get("Info", 0)
+                    ]
+                }
+                
+                df_summary = pd.DataFrame(summary)
+                st.dataframe(df_summary, use_container_width=True, hide_index=True)
+            else:
+                st.info("Risk summary unavailable")
     
     with tab3:
         st.subheader("Risk Mitigation Strategies")
         
-        mitigation_data = {
-            "Risk": ["Data Breach", "System Downtime", "Compliance Violation"],
-            "Mitigation": ["Encryption, Access Controls, Monitoring", "Backup Systems, Redundancy", "Training, Policies, Audits"],
-            "Owner": ["Security Team", "IT Team", "Compliance Team"],
-            "Due Date": ["2024-02-15", "2024-02-20", "2024-02-25"],
-            "Status": ["In Progress", "Completed", "In Progress"]
-        }
+        # Get SOAR workflows as mitigation strategies
+        workflows_result = api_client.get_soar_workflows()
         
-        df_mitigation = pd.DataFrame(mitigation_data)
-        st.dataframe(df_mitigation, use_container_width=True, hide_index=True)
+        if workflows_result["success"] and workflows_result["data"] and isinstance(workflows_result["data"], list):
+            workflows = workflows_result["data"]
+            
+            mitigation = []
+            for workflow in workflows:
+                if isinstance(workflow, dict):
+                    mitigation.append({
+                        "Risk/Trigger": workflow.get("trigger_event", "N/A"),
+                        "Mitigation Actions": ", ".join(workflow.get("actions", [])) if workflow.get("actions") else "No actions defined",
+                        "Workflow": workflow.get("name", "Unnamed"),
+                        "Status": workflow.get("status", "unknown").capitalize()
+                    })
+            
+            if mitigation:
+                df_mitigation = pd.DataFrame(mitigation)
+                st.dataframe(df_mitigation, use_container_width=True, hide_index=True)
+            else:
+                st.info("No mitigation strategies defined. Create SOAR workflows to automate risk mitigation.")
+        else:
+            st.info("No mitigation strategies available. Create SOAR workflows in the Security Monitoring section.")
         
         st.markdown("---")
+        
+        # Calculate mitigation metrics from workflows and events
+        severity_result = api_client.get_severity_distribution()
+        threat_result = api_client.get_threat_summary()
         
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.metric("Mitigation Rate", "78%", "5%")
+            if workflows_result["success"] and isinstance(workflows_result.get("data"), list):
+                workflows_data = workflows_result.get("data", [])
+                active_workflows = len([w for w in workflows_data if isinstance(w, dict) and w.get("status") == "active"])
+                total_workflows = len(workflows_data)
+                mitigation_rate = int((active_workflows / total_workflows * 100)) if total_workflows > 0 else 0
+                st.metric("Mitigation Rate", f"{mitigation_rate}%")
+            else:
+                st.metric("Mitigation Rate", "N/A")
         
         with col2:
-            st.metric("Avg Resolution Time", "15 days", "-2 days")
+            if severity_result["success"]:
+                total_risks = sum(severity_result["data"].values())
+                st.metric("Total Risks", total_risks)
+            else:
+                st.metric("Total Risks", "N/A")
         
         with col3:
-            st.metric("Risk Reduction", "23%", "8%")
+            if threat_result["success"]:
+                security_score = threat_result["data"].get("security_score", 0)
+                st.metric("Security Score", f"{security_score:.1f}%")
+            else:
+                st.metric("Security Score", "N/A")

@@ -84,7 +84,11 @@ class SecurityFrameworkAPIClient:
     def get_security_events(self) -> Dict[str, Any]:
         events_url = f"{self.api_base_url}/api/v1/monitoring/events"
         response = self.http_session.get(events_url, headers=self._get_authentication_headers())
-        return self._process_api_response(response)
+        result = self._process_api_response(response)
+        # Extract events list from response
+        if result["success"] and isinstance(result["data"], dict) and "events" in result["data"]:
+            result["data"] = result["data"]["events"]
+        return result
     
     def get_compliance_status_overview(self) -> Dict[str, Any]:
         compliance_status_url = f"{self.api_base_url}/api/v1/compliance/status"
@@ -99,7 +103,11 @@ class SecurityFrameworkAPIClient:
     def get_soar_workflows(self) -> Dict[str, Any]:
         soar_workflows_url = f"{self.api_base_url}/api/v1/soar/workflows"
         response = self.http_session.get(soar_workflows_url, headers=self._get_authentication_headers())
-        return self._process_api_response(response)
+        result = self._process_api_response(response)
+        # Extract workflows list from response
+        if result["success"] and isinstance(result["data"], dict) and "workflows" in result["data"]:
+            result["data"] = result["data"]["workflows"]
+        return result
     
     def create_soar_workflow(self, workflow_configuration: Dict[str, Any]) -> Dict[str, Any]:
         soar_workflow_creation_url = f"{self.api_base_url}/api/v1/soar/workflows"

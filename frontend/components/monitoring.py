@@ -1,310 +1,307 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
-from datetime import datetime, timedelta
-import random
 from services.api_client import SecurityFrameworkAPIClient
 
 def show_security_monitoring(api_client: SecurityFrameworkAPIClient):
-    st.title("🔍 Security Monitoring & SIEM")
+    st.title("Security Monitoring & SIEM")
     
-    tab1, tab2, tab3 = st.tabs(["📊 Security Dashboard", "🚨 Event Management", "📈 Analytics & Reports"])
+    # Refresh button
+    if st.button("Refresh", key="refresh_monitoring", use_container_width=False):
+        st.rerun()
     
-    with tab1:
-        st.subheader("Real-time Security Dashboard")
-        
-        # Get dynamic dashboard data
-        dashboard_result = api_client.get_security_dashboard_data()
-        
-        if dashboard_result["success"]:
-            dashboard_data = dashboard_result["data"]
-            
-            col1, col2, col3, col4 = st.columns(4)
-            
-            with col1:
-                st.metric("Total Events", dashboard_data.get("total_events", 0))
-            
-            with col2:
-                st.metric("Critical Events", dashboard_data.get("critical_events", 0))
-            
-            with col3:
-                st.metric("High Severity", dashboard_data.get("high_severity_events", 0))
-            
-            with col4:
-                st.metric("Recent Events (24h)", dashboard_data.get("recent_events", 0))
-        else:
-            st.warning("Dashboard metrics unavailable")
-        
-        st.markdown("---")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("**Threat Level Distribution**")
-            severity_result = api_client.get_severity_distribution()
-            
-            if severity_result["success"]:
-                severity_data = severity_result["data"]
-                if severity_data:
-                    df_threats = pd.DataFrame([
-                        {"Level": k, "Count": v} for k, v in severity_data.items()
-                    ])
-                    fig = px.pie(df_threats, values="Count", names="Level", 
-                                color_discrete_sequence=px.colors.qualitative.Set3)
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.info("No severity data available")
-            else:
-                st.info("No severity distribution data")
-        
-        with col2:
-            st.markdown("**Security Events Timeline")
-            timeline_result = api_client.get_security_timeline(days=7)
-            
-            if timeline_result["success"] and timeline_result["data"]["timeline"]:
-                timeline_data = timeline_result["data"]["timeline"]
-                df_events = pd.DataFrame(timeline_data)
-                df_events['date'] = pd.to_datetime(df_events['date'])
-                
-                fig = px.line(df_events, x='date', y='count', title='Events Over Time')
-                fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("No timeline data available")
+    st.markdown("---")
     
-    with tab2:
-        st.subheader("Security Event Management")
-        
-        col1, col2 = st.columns([2, 1])
-        
-        with col1:
-            st.markdown("**Create Security Event**")
-            with st.form("event_form"):
-                event_type = st.selectbox("Event Type", ["Login Attempt", "Data Access", "System Alert", "Network Anomaly"])
-                source = st.text_input("Source", placeholder="e.g., Firewall, IDS, User")
-                severity = st.selectbox("Severity", ["Low", "Medium", "High", "Critical"])
-                description = st.text_area("Description", placeholder="Event description...")
-                
-                metadata = st.text_input("Metadata (JSON)", placeholder='{"ip": "192.168.1.1", "user": "admin"}')
-                
-                if st.form_submit_button("🚨 Create Event", use_container_width=True):
-                    event_data = {
-                        "event_type": event_type,
-                        "source": source,
-                        "severity": severity,
-                        "description": description,
-                        "metadata": metadata if metadata else {}
-                    }
-                    
-                    with st.spinner("Creating event..."):
-                        result = api_client.ingest_security_event(event_data)
-                    
-                    if result["success"]:
-                        st.success("✅ Event created successfully!")
-                    else:
-                        st.error(f"Failed to create event: {result.get('error', 'Unknown error')}")
-        
-        with col2:
-            st.markdown("**Quick Actions**")
-            if st.button("🔄 Refresh Events", use_container_width=True):
-                st.rerun()
-            
-            if st.button("📊 Generate Report", use_container_width=True):
-                st.info("Report generation started...")
-            
-            if st.button("🚨 Alert Team", use_container_width=True):
-                st.warning("Security team alerted!")
-        
-        st.markdown("---")
-        
-        result = api_client.get_security_events()
-        if result["success"]:
-            events_data = result["data"]
-            if isinstance(events_data, list) and len(events_data) > 0:
-                df_events = pd.DataFrame(events_data)
-                st.dataframe(df_events, use_container_width=True, hide_index=True)
-            else:
-                st.info("No events found")
-        else:
-            st.error(f"Failed to load events: {result.get('error', 'Unknown error')}")
+    # Security Metrics
+    dashboard_result = api_client.get_security_dashboard_data()
     
-    with tab3:
-        st.subheader("Security Analytics & Reports")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("**Top Security Sources**")
-            sources_result = api_client.get_event_sources()
-            
-            if sources_result["success"] and sources_result["data"]["sources"]:
-                df_sources = pd.DataFrame(sources_result["data"]["sources"])
-                df_sources.columns = ["Source", "Events"]
-                st.dataframe(df_sources, use_container_width=True, hide_index=True)
-            else:
-                st.info("No event source data available")
-        
-        with col2:
-            st.markdown("**Security Metrics Summary**")
-            dashboard_result = api_client.get_security_dashboard_data()
-            
-            if dashboard_result["success"]:
-                data = dashboard_result["data"]
-                metrics_data = {
-                    "Metric": ["Total Events", "Critical Events", "High Severity", "Recent (24h)"],
-                    "Value": [
-                        data.get("total_events", 0),
-                        data.get("critical_events", 0),
-                        data.get("high_severity_events", 0),
-                        data.get("recent_events", 0)
-                    ]
-                }
-                df_metrics = pd.DataFrame(metrics_data)
-                st.dataframe(df_metrics, use_container_width=True, hide_index=True)
-            else:
-                st.info("No metrics data available")
-        
-        st.markdown("---")
-        
-        # Get threat summary for additional metrics
-        threat_result = api_client.get_threat_summary()
-        
-        if threat_result["success"]:
-            threat_data = threat_result["data"]
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.metric("Total Threats", threat_data.get("total_threats", 0))
-            
-            with col2:
-                st.metric("Security Score", f"{threat_data.get('security_score', 0):.1f}%")
-            
-            with col3:
-                events_result = api_client.get_security_events()
-                event_count = len(events_result.get("data", [])) if events_result["success"] else 0
-                st.metric("Total Events", event_count)
-
-def show_incident_response(api_client: SecurityFrameworkAPIClient):
-    st.title("🚨 Incident Response & SOAR")
-    
-    tab1, tab2, tab3 = st.tabs(["🎯 Incident Dashboard", "🤖 Automated Workflows", "📋 Response Playbooks"])
-    
-    with tab1:
-        st.subheader("Active Incidents")
-        
-        # Get high-severity events as incidents
-        events_result = api_client.get_security_events()
-        
-        if events_result["success"] and events_result["data"]:
-            events_data = events_result["data"]
-            # Filter for high and critical severity
-            incidents = [e for e in events_data if e.get("severity", "").lower() in ["high", "critical"]]
-            
-            if incidents:
-                df_incidents = pd.DataFrame(incidents)
-                # Select relevant columns
-                display_cols = [col for col in ["event_id", "severity", "event_type", "source", "description", "created_at"] if col in df_incidents.columns]
-                st.dataframe(df_incidents[display_cols], use_container_width=True, hide_index=True)
-            else:
-                st.info("No high-severity incidents found")
-        else:
-            st.info("No incident data available")
-        
-        st.markdown("---")
-        
-        # Get metrics from dashboard
-        dashboard_result = api_client.get_security_dashboard_data()
-        threat_result = api_client.get_threat_summary()
+    if dashboard_result["success"]:
+        data = dashboard_result["data"]
         
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            if dashboard_result["success"]:
-                critical = dashboard_result["data"].get("critical_events", 0)
-                high = dashboard_result["data"].get("high_severity_events", 0)
-                st.metric("Active Incidents", critical + high)
-            else:
-                st.metric("Active Incidents", "N/A")
+            st.metric("Total Events", data.get("total_events", 0))
         
         with col2:
-            st.metric("Avg Response Time", "N/A")
+            st.metric("Critical Events", data.get("critical_events", 0))
         
         with col3:
-            if threat_result["success"]:
-                score = threat_result["data"].get("security_score", 0)
-                st.metric("Security Score", f"{score:.1f}%")
-            else:
-                st.metric("Security Score", "N/A")
+            st.metric("High Severity", data.get("high_severity_events", 0))
         
         with col4:
-            workflows_result = api_client.get_soar_workflows()
-            if workflows_result["success"]:
-                workflow_count = len(workflows_result.get("data", []))
-                st.metric("Active Workflows", workflow_count)
-            else:
-                st.metric("Active Workflows", "N/A")
+            st.metric("Recent (24h)", data.get("recent_events", 0))
+    else:
+        st.warning("Unable to load security metrics")
     
-    with tab2:
-        st.subheader("SOAR Workflows")
+    st.markdown("---")
+    
+    # Severity Distribution Chart
+    st.subheader("Threat Level Distribution")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        severity_result = api_client.get_severity_distribution()
         
-        result = api_client.get_soar_workflows()
-        if result["success"]:
-            workflows_data = result["data"]
-            if isinstance(workflows_data, list) and len(workflows_data) > 0:
-                df_workflows = pd.DataFrame(workflows_data)
-                st.dataframe(df_workflows, use_container_width=True, hide_index=True)
-            else:
-                st.info("No workflows found")
-        else:
-            st.error(f"Failed to load workflows: {result.get('error', 'Unknown error')}")
-        
-        st.markdown("---")
-        
-        st.markdown("**Create New Workflow**")
-        with st.form("workflow_form"):
-            workflow_name = st.text_input("Workflow Name")
-            trigger_event = st.selectbox("Trigger Event", ["High Severity Alert", "Data Breach", "Unauthorized Access", "System Anomaly"])
-            actions = st.multiselect("Actions", ["Block IP", "Notify Team", "Isolate Host", "Generate Report", "Update Firewall"])
+        if severity_result["success"] and severity_result["data"]:
+            severity_data = severity_result["data"]
             
-            if st.form_submit_button("🤖 Create Workflow", use_container_width=True):
-                workflow_data = {
-                    "name": workflow_name,
-                    "trigger_event": trigger_event,
-                    "actions": actions
-                }
-                
-                with st.spinner("Creating workflow..."):
-                    result = api_client.create_soar_workflow(workflow_data)
-                
-                if result["success"]:
-                    st.success("✅ Workflow created successfully!")
-                else:
-                    st.error(f"Failed to create workflow: {result.get('error', 'Unknown error')}")
+            df_severity = pd.DataFrame([
+                {"Severity": k, "Count": v} for k, v in severity_data.items() if v > 0
+            ])
+            
+            if not df_severity.empty:
+                fig = px.pie(df_severity, values="Count", names="Severity",
+                            title="Events by Severity",
+                            color_discrete_sequence=px.colors.qualitative.Set3)
+                fig.update_layout(
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    font_color='white'
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No severity data available")
+        else:
+            st.info("Unable to load severity distribution")
     
-    with tab3:
-        st.subheader("Response Playbooks")
+    with col2:
+        sources_result = api_client.get_event_sources()
         
-        playbooks = [
-            {
-                "Playbook": "Data Breach Response",
-                "Severity": "Critical",
-                "Steps": "1. Contain breach 2. Assess damage 3. Notify stakeholders 4. Document evidence",
-                "Status": "Active"
-            },
-            {
-                "Playbook": "Malware Incident",
-                "Severity": "High",
-                "Steps": "1. Isolate affected systems 2. Scan for malware 3. Remove threats 4. Update defenses",
-                "Status": "Active"
-            },
-            {
-                "Playbook": "Unauthorized Access",
-                "Severity": "Medium",
-                "Steps": "1. Revoke access 2. Investigate source 3. Strengthen controls 4. Monitor activity",
-                "Status": "Active"
-            }
-        ]
+        if sources_result["success"] and sources_result["data"].get("sources"):
+            sources = sources_result["data"]["sources"]
+            
+            df_sources = pd.DataFrame(sources, columns=["Source", "Count"])
+            
+            fig = px.bar(df_sources, x="Source", y="Count",
+                        title="Top Event Sources",
+                        color_discrete_sequence=["#636EFA"])
+            fig.update_layout(
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                font_color='white'
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No event source data available")
+    
+    st.markdown("---")
+    
+    # Security Events Table
+    st.subheader("Recent Security Events")
+    
+    # Create Event Button
+    if st.button("Create Security Event"):
+        st.session_state.show_create_event = True
+    
+    # Create Event Form
+    if st.session_state.get('show_create_event', False):
+        with st.form("event_form"):
+            st.markdown("### Create New Security Event")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                event_type = st.selectbox("Event Type*", 
+                    ["Login Attempt", "Data Access", "System Alert", "Network Anomaly", "Unauthorized Access"])
+                source = st.text_input("Source*", placeholder="e.g., Firewall, IDS, Application")
+            
+            with col2:
+                severity = st.selectbox("Severity*", ["Low", "Medium", "High", "Critical"])
+                description = st.text_area("Description*", placeholder="Event description...")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.form_submit_button("Create Event", use_container_width=True):
+                    if event_type and source and severity and description:
+                        event_data = {
+                            "event_type": event_type,
+                            "source": source,
+                            "severity": severity,
+                            "description": description
+                        }
+                        
+                        result = api_client.ingest_security_event(event_data)
+                        
+                        if result["success"]:
+                            st.success("Event created successfully!")
+                            st.session_state.show_create_event = False
+                            st.rerun()
+                        else:
+                            st.error(f"Error: {result.get('error', 'Failed to create event')}")
+                    else:
+                        st.error("Please fill in all required fields")
+            
+            with col2:
+                if st.form_submit_button("Cancel", use_container_width=True):
+                    st.session_state.show_create_event = False
+                    st.rerun()
+    
+    # Display Events
+    events_result = api_client.get_security_events()
+    
+    if events_result["success"]:
+        events = events_result.get("data", [])
         
-        df_playbooks = pd.DataFrame(playbooks)
-        st.dataframe(df_playbooks, use_container_width=True, hide_index=True)
+        if isinstance(events, list) and len(events) > 0:
+            df_events = pd.DataFrame(events)
+            
+            # Select relevant columns
+            display_cols = [col for col in ["event_id", "severity", "event_type", "source", "description", "timestamp"] 
+                          if col in df_events.columns]
+            
+            if display_cols:
+                st.dataframe(df_events[display_cols], use_container_width=True, hide_index=True)
+            else:
+                st.dataframe(df_events, use_container_width=True, hide_index=True)
+        else:
+            st.info("No security events found. Create your first event above.")
+    else:
+        st.error(f"Failed to load events: {events_result.get('error', 'Unknown error')}")
+
+
+def show_incident_response(api_client: SecurityFrameworkAPIClient):
+    st.title("Incident Response & SOAR")
+    
+    # Refresh button
+    if st.button("Refresh", key="refresh_incident", use_container_width=False):
+        st.rerun()
+    
+    st.markdown("---")
+    
+    # Incident Metrics
+    dashboard_result = api_client.get_security_dashboard_data()
+    threat_result = api_client.get_threat_summary()
+    workflows_result = api_client.get_soar_workflows()
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        if dashboard_result["success"]:
+            critical = dashboard_result["data"].get("critical_events", 0)
+            high = dashboard_result["data"].get("high_severity_events", 0)
+            st.metric("Active Incidents", critical + high)
+        else:
+            st.metric("Active Incidents", "N/A")
+    
+    with col2:
+        if workflows_result["success"] and workflows_result["data"] and isinstance(workflows_result["data"], list):
+            active_count = len([w for w in workflows_result["data"] if isinstance(w, dict) and w.get("status") == "active"])
+            st.metric("Active Workflows", active_count)
+        else:
+            st.metric("Active Workflows", 0)
+    
+    with col3:
+        if threat_result["success"]:
+            score = threat_result["data"].get("security_score", 0)
+            st.metric("Security Score", f"{score:.1f}%")
+        else:
+            st.metric("Security Score", "N/A")
+    
+    with col4:
+        if threat_result["success"]:
+            threats = threat_result["data"].get("total_threats", 0)
+            st.metric("Total Threats", threats)
+        else:
+            st.metric("Total Threats", "N/A")
+    
+    st.markdown("---")
+    
+    # High-Severity Incidents
+    st.subheader("High-Severity Incidents")
+    
+    events_result = api_client.get_security_events()
+    
+    if events_result["success"]:
+        events = events_result.get("data", [])
+        
+        if isinstance(events, list) and len(events) > 0:
+            # Filter for high and critical severity
+            incidents = [e for e in events if isinstance(e, dict) and e.get("severity", "").lower() in ["high", "critical"]]
+            
+            if incidents:
+                df_incidents = pd.DataFrame(incidents)
+                display_cols = [col for col in ["event_id", "severity", "event_type", "source", "description", "timestamp"] 
+                              if col in df_incidents.columns]
+                
+                if display_cols:
+                    st.dataframe(df_incidents[display_cols], use_container_width=True, hide_index=True)
+                else:
+                    st.dataframe(df_incidents, use_container_width=True, hide_index=True)
+            else:
+                st.info("No high-severity incidents found")
+        else:
+            st.info("No security events available. Create events in the Security Monitoring section.")
+    else:
+        st.error(f"Failed to load incidents: {events_result.get('error', 'Unknown error')}")
+    
+    st.markdown("---")
+    
+    # SOAR Workflows
+    st.subheader("SOAR Workflows")
+    
+    # Create Workflow Button
+    if st.button("Create Workflow"):
+        st.session_state.show_create_workflow = True
+    
+    # Create Workflow Form
+    if st.session_state.get('show_create_workflow', False):
+        with st.form("workflow_form"):
+            st.markdown("### Create New Workflow")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                workflow_name = st.text_input("Workflow Name*")
+                trigger_event = st.selectbox("Trigger Event*", 
+                    ["High Severity Alert", "Data Breach", "Unauthorized Access", "System Anomaly", "Malware Detection"])
+            
+            with col2:
+                actions = st.multiselect("Actions*", 
+                    ["Block IP", "Notify Team", "Isolate Host", "Generate Report", "Update Firewall", "Quarantine File"])
+                status = st.selectbox("Status", ["active", "inactive"])
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.form_submit_button("Create Workflow", use_container_width=True):
+                    if workflow_name and trigger_event and actions:
+                        workflow_data = {
+                            "name": workflow_name,
+                            "trigger_event": trigger_event,
+                            "actions": actions,
+                            "status": status
+                        }
+                        
+                        result = api_client.create_soar_workflow(workflow_data)
+                        
+                        if result["success"]:
+                            st.success("Workflow created successfully!")
+                            st.session_state.show_create_workflow = False
+                            st.rerun()
+                        else:
+                            st.error(f"Error: {result.get('error', 'Failed to create workflow')}")
+                    else:
+                        st.error("Please fill in all required fields")
+            
+            with col2:
+                if st.form_submit_button("Cancel", use_container_width=True):
+                    st.session_state.show_create_workflow = False
+                    st.rerun()
+    
+    # Display Workflows
+    if workflows_result["success"]:
+        workflows = workflows_result.get("data", [])
+        
+        if isinstance(workflows, list) and len(workflows) > 0:
+            df_workflows = pd.DataFrame(workflows)
+            
+            display_cols = [col for col in ["workflow_id", "name", "trigger_event", "actions", "status", "created_at"] 
+                          if col in df_workflows.columns]
+            
+            if display_cols:
+                st.dataframe(df_workflows[display_cols], use_container_width=True, hide_index=True)
+            else:
+                st.dataframe(df_workflows, use_container_width=True, hide_index=True)
+        else:
+            st.info("No workflows found. Create your first workflow above.")
+    else:
+        st.error(f"Failed to load workflows: {workflows_result.get('error', 'Unknown error')}")
