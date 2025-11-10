@@ -127,7 +127,7 @@ class ComplianceService:
                     "resource": log.resource,
                     "ip_address": log.ip_address,
                     "user_agent": log.user_agent,
-                    "metadata": log.metadata,
+                    "metadata": log.event_metadata,
                     "timestamp": log.created_at.isoformat()
                 })
             

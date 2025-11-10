@@ -32,7 +32,7 @@ def show_user_management(api_client: SecurityFrameworkAPIClient):
                     with col1:
                         if st.form_submit_button("Create User", use_container_width=True):
                             if new_username and new_email and new_password:
-                                result = api_client.register(new_username, new_email, new_password, new_role)
+                                result = api_client.register_new_user(new_username, new_email, new_password, new_role)
                                 if result["success"]:
                                     st.success("User created successfully!")
                                     st.session_state.show_add_user = False
@@ -47,7 +47,7 @@ def show_user_management(api_client: SecurityFrameworkAPIClient):
                             st.session_state.show_add_user = False
                             st.rerun()
         
-        result = api_client.get_users()
+        result = api_client.get_all_users()
         if result["success"]:
             users_data = result["data"]
             if isinstance(users_data, list) and len(users_data) > 0:

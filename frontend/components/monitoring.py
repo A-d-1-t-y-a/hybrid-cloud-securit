@@ -82,7 +82,7 @@ def show_security_monitoring(api_client: SecurityFrameworkAPIClient):
                     }
                     
                     with st.spinner("Creating event..."):
-                        result = api_client.ingest_event(event_data)
+                        result = api_client.ingest_security_event(event_data)
                     
                     if result["success"]:
                         st.success("✅ Event created successfully!")
@@ -102,7 +102,7 @@ def show_security_monitoring(api_client: SecurityFrameworkAPIClient):
         
         st.markdown("---")
         
-        result = api_client.get_events()
+        result = api_client.get_security_events()
         if result["success"]:
             events_data = result["data"]
             if isinstance(events_data, list) and len(events_data) > 0:
@@ -190,7 +190,7 @@ def show_incident_response(api_client: SecurityFrameworkAPIClient):
     with tab2:
         st.subheader("SOAR Workflows")
         
-        result = api_client.get_workflows()
+        result = api_client.get_soar_workflows()
         if result["success"]:
             workflows_data = result["data"]
             if isinstance(workflows_data, list) and len(workflows_data) > 0:
@@ -217,7 +217,7 @@ def show_incident_response(api_client: SecurityFrameworkAPIClient):
                 }
                 
                 with st.spinner("Creating workflow..."):
-                    result = api_client.create_workflow(workflow_data)
+                    result = api_client.create_soar_workflow(workflow_data)
                 
                 if result["success"]:
                     st.success("✅ Workflow created successfully!")

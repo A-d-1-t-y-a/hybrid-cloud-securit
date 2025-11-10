@@ -31,7 +31,7 @@ class MonitoringService:
                 description=event_data.get("description", ""),
                 user_id=event_data.get("user_id"),
                 ip_address=event_data.get("ip_address"),
-                metadata=event_data.get("metadata", {})
+                event_metadata=event_data.get("metadata", {})
             )
             
             self.db.add(event)
@@ -116,7 +116,7 @@ class MonitoringService:
                 resource=resource,
                 ip_address=ip_address,
                 user_agent=user_agent,
-                metadata=metadata or {}
+                event_metadata=metadata or {}
             )
             
             self.db.add(audit_log)

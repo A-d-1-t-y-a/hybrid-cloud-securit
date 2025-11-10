@@ -100,7 +100,7 @@ def show_data_classification(api_client: SecurityFrameworkAPIClient):
             if st.button("🔓 Decrypt", use_container_width=True):
                 if encrypted_data:
                     with st.spinner("Decrypting data..."):
-                        result = api_client.decrypt_data(encrypted_data)
+                        result = api_client.decrypt_encrypted_data(encrypted_data)
                     
                     if result["success"]:
                         decrypted_data = result["data"]

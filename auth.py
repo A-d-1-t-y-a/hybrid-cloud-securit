@@ -13,6 +13,8 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from config import settings
+import hashlib
+import base64
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -20,13 +22,41 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 # JWT token handling
 security = HTTPBearer()
 
+def _prepare_password_for_bcrypt(password: str) -> str:
+    """
+    Prepare password for bcrypt hashing.
+    Bcrypt has a 72-byte limit, so we ensure the password is always <= 72 bytes.
+    For passwords longer than 72 bytes, we hash with SHA256 first and encode as base64.
+    """
+    password_bytes = password.encode('utf-8')
+    
+    # Bcrypt limit is 72 bytes
+    if len(password_bytes) > 72:
+        # Hash with SHA256 first if password is too long
+        password_hash = hashlib.sha256(password_bytes).digest()
+        # Encode as base64 to get a safe string representation (44 chars = 44 bytes, well under 72)
+        password_str = base64.b64encode(password_hash).decode('utf-8')
+        return password_str
+    else:
+        # Password is already <= 72 bytes, return as-is
+        return password
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify password"""
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        prepared_password = _prepare_password_for_bcrypt(plain_password)
+        return pwd_context.verify(prepared_password, hashed_password)
+    except Exception:
+        # Fallback: try original password (for backward compatibility with existing passwords)
+        try:
+            return pwd_context.verify(plain_password, hashed_password)
+        except Exception:
+            return False
 
 def get_password_hash(password: str) -> str:
     """Hash password"""
-    return pwd_context.hash(password)
+    prepared_password = _prepare_password_for_bcrypt(password)
+    return pwd_context.hash(prepared_password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """Create JWT access token"""

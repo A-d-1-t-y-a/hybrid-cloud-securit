@@ -16,7 +16,8 @@ class SecurityFrameworkAPIClient:
     
     def _process_api_response(self, response: requests.Response) -> Dict[str, Any]:
         try:
-            if response.status_code == 200:
+            if 200 <= response.status_code < 300:
+                # Treat all 2xx as success
                 return {"success": True, "data": response.json()}
             elif response.status_code == 401:
                 return {"success": False, "error": "Authentication required. Please login again."}
@@ -36,7 +37,8 @@ class SecurityFrameworkAPIClient:
         if result["success"] and "access_token" in result["data"]:
             st.session_state.authentication_token = result["data"]["access_token"]
             st.session_state.current_username = username
-            st.session_state.user_role = result["data"].get("role", "user")
+            # Role is nested under user in API response
+            st.session_state.user_role = result["data"].get("user", {}).get("role", "user")
         
         return result
     

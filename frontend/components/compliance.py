@@ -11,7 +11,7 @@ def show_compliance_management(api_client: SecurityFrameworkAPIClient):
     with tab1:
         st.subheader("Compliance Status Overview")
         
-        result = api_client.get_compliance_status()
+        result = api_client.get_compliance_status_overview()
         if result["success"]:
             compliance_data = result["data"]
             st.json(compliance_data)
@@ -70,7 +70,7 @@ def show_compliance_management(api_client: SecurityFrameworkAPIClient):
     with tab2:
         st.subheader("Policy Management")
         
-        result = api_client.get_compliance_policies()
+        result = api_client.get_compliance_policies_list()
         if result["success"]:
             policies_data = result["data"]
             if isinstance(policies_data, list) and len(policies_data) > 0:
