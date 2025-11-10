@@ -20,19 +20,21 @@ def show_compliance_management(api_client: SecurityFrameworkAPIClient):
         
         st.markdown("---")
         
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric("GDPR Compliance", "98%", "2%")
-        
-        with col2:
-            st.metric("HIPAA Compliance", "95%", "3%")
-        
-        with col3:
-            st.metric("SOX Compliance", "92%", "5%")
-        
-        with col4:
-            st.metric("ISO 27001", "96%", "1%")
+        # Get compliance data for metrics
+        if result["success"] and "standards" in result["data"]:
+            standards = result["data"]["standards"]
+            
+            col1, col2, col3, col4 = st.columns(4)
+            
+            standard_names = list(standards.keys())[:4]  # Get first 4 standards
+            cols = [col1, col2, col3, col4]
+            
+            for i, (col, std_name) in enumerate(zip(cols, standard_names)):
+                with col:
+                    score = standards[std_name].get("score", 0)
+                    st.metric(f"{std_name} Compliance", f"{score}%")
+        else:
+            st.info("Compliance metrics unavailable")
         
         st.markdown("---")
         
@@ -40,32 +42,51 @@ def show_compliance_management(api_client: SecurityFrameworkAPIClient):
         
         with col1:
             st.markdown("**Compliance by Standard**")
-            standards_data = {
-                "Standard": ["GDPR", "HIPAA", "SOX", "ISO 27001", "PCI DSS"],
-                "Score": [98, 95, 92, 96, 94],
-                "Status": ["Compliant", "Compliant", "Compliant", "Compliant", "Compliant"]
-            }
-            df_standards = pd.DataFrame(standards_data)
             
-            fig = px.bar(df_standards, x="Standard", y="Score", 
-                        color="Score", color_continuous_scale="RdYlGn")
-            fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
-            st.plotly_chart(fig, use_container_width=True)
+            if result["success"] and "standards" in result["data"]:
+                standards = result["data"]["standards"]
+                standards_list = []
+                
+                for std_name, std_data in standards.items():
+                    standards_list.append({
+                        "Standard": std_name,
+                        "Score": std_data.get("score", 0),
+                        "Status": "Compliant" if std_data.get("score", 0) >= 90 else "Non-Compliant"
+                    })
+                
+                df_standards = pd.DataFrame(standards_list)
+                
+                fig = px.bar(df_standards, x="Standard", y="Score", 
+                            color="Score", color_continuous_scale="RdYlGn")
+                fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("No compliance standards data available")
         
         with col2:
-            st.markdown("**Compliance Trends**")
-            trends_data = {
-                "Month": ["Jan", "Feb", "Mar", "Apr", "May", "Jun"],
-                "GDPR": [95, 96, 97, 98, 98, 98],
-                "HIPAA": [92, 93, 94, 95, 95, 95],
-                "SOX": [88, 89, 90, 91, 92, 92]
-            }
-            df_trends = pd.DataFrame(trends_data)
+            st.markdown("**Compliance Summary**")
             
-            fig = px.line(df_trends, x="Month", y=["GDPR", "HIPAA", "SOX"], 
-                        title="Compliance Score Trends")
-            fig.update_layout(plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)')
-            st.plotly_chart(fig, use_container_width=True)
+            if result["success"]:
+                overall_score = result["data"].get("overall_score", 0)
+                st.metric("Overall Compliance Score", f"{overall_score}%")
+                
+                if "standards" in result["data"]:
+                    standards = result["data"]["standards"]
+                    summary_data = []
+                    
+                    for std_name, std_data in standards.items():
+                        summary_data.append({
+                            "Standard": std_name,
+                            "Score": f"{std_data.get('score', 0)}%",
+                            "Status": std_data.get("status", "Unknown")
+                        })
+                    
+                    df_summary = pd.DataFrame(summary_data)
+                    st.dataframe(df_summary, use_container_width=True, hide_index=True)
+                else:
+                    st.info("No detailed compliance data")
+            else:
+                st.info("Compliance summary unavailable")
     
     with tab2:
         st.subheader("Policy Management")
@@ -83,68 +104,103 @@ def show_compliance_management(api_client: SecurityFrameworkAPIClient):
         
         st.markdown("---")
         
-        st.markdown("**Policy Categories**")
-        policy_categories = {
-            "Category": ["Data Protection", "Access Control", "Incident Response", "Risk Management", "Audit"],
-            "Policies": [15, 12, 8, 10, 6],
-            "Status": ["Active", "Active", "Active", "Active", "Active"],
-            "Last Updated": ["2 days ago", "1 week ago", "3 days ago", "5 days ago", "1 day ago"]
-        }
+        st.markdown("**Policy Summary**")
         
-        df_categories = pd.DataFrame(policy_categories)
-        st.dataframe(df_categories, use_container_width=True, hide_index=True)
-        
-        st.markdown("---")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.metric("Total Policies", "51")
-        
-        with col2:
-            st.metric("Active Policies", "48")
-        
-        with col3:
-            st.metric("Under Review", "3")
+        if result["success"]:
+            policies = result["data"]
+            
+            if isinstance(policies, list) and len(policies) > 0:
+                # Group by framework if available
+                policy_summary = {}
+                for policy in policies:
+                    framework = policy.get("framework", "General")
+                    if framework not in policy_summary:
+                        policy_summary[framework] = {"count": 0, "active": 0}
+                    policy_summary[framework]["count"] += 1
+                    if policy.get("is_active", True):
+                        policy_summary[framework]["active"] += 1
+                
+                summary_data = []
+                for framework, data in policy_summary.items():
+                    summary_data.append({
+                        "Framework": framework,
+                        "Total Policies": data["count"],
+                        "Active": data["active"],
+                        "Status": "Active"
+                    })
+                
+                df_summary = pd.DataFrame(summary_data)
+                st.dataframe(df_summary, use_container_width=True, hide_index=True)
+                
+                st.markdown("---")
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.metric("Total Policies", len(policies))
+                
+                with col2:
+                    active_count = sum(1 for p in policies if p.get("is_active", True))
+                    st.metric("Active Policies", active_count)
+                
+                with col3:
+                    inactive_count = len(policies) - active_count
+                    st.metric("Inactive", inactive_count)
+            else:
+                st.info("No policy data available")
+        else:
+            st.info("Policy summary unavailable")
     
     with tab3:
         st.subheader("Audit & Reporting")
         
-        st.markdown("**Recent Audit Results**")
-        audit_results = {
-            "Audit Date": ["2024-01-15", "2024-01-10", "2024-01-05", "2024-01-01"],
-            "Audit Type": ["GDPR Compliance", "Security Controls", "Data Protection", "Access Review"],
-            "Status": ["Passed", "Passed", "Minor Issues", "Passed"],
-            "Score": ["98%", "95%", "88%", "96%"],
-            "Findings": [0, 0, 2, 0]
-        }
+        st.markdown("**Compliance Audit Summary**")
         
-        df_audit = pd.DataFrame(audit_results)
-        st.dataframe(df_audit, use_container_width=True, hide_index=True)
+        compliance_result = api_client.get_compliance_status_overview()
         
-        st.markdown("---")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("**Audit Schedule**")
-            schedule_data = {
-                "Audit": ["GDPR Assessment", "Security Review", "Data Classification", "Access Control"],
-                "Due Date": ["2024-02-15", "2024-02-20", "2024-02-25", "2024-03-01"],
-                "Status": ["Scheduled", "Scheduled", "Scheduled", "Scheduled"]
-            }
-            df_schedule = pd.DataFrame(schedule_data)
-            st.dataframe(df_schedule, use_container_width=True, hide_index=True)
-        
-        with col2:
-            st.markdown("**Compliance Metrics**")
-            metrics_data = {
-                "Metric": ["Policy Coverage", "Training Completion", "Incident Response", "Risk Assessment"],
-                "Score": ["96%", "94%", "98%", "92%"],
-                "Target": ["95%", "95%", "95%", "90%"]
-            }
-            df_metrics = pd.DataFrame(metrics_data)
-            st.dataframe(df_metrics, use_container_width=True, hide_index=True)
+        if compliance_result["success"]:
+            compliance_data = compliance_result["data"]
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("**Compliance Standards Status**")
+                
+                if "standards" in compliance_data:
+                    standards = compliance_data["standards"]
+                    audit_data = []
+                    
+                    for std_name, std_data in standards.items():
+                        score = std_data.get("score", 0)
+                        audit_data.append({
+                            "Standard": std_name,
+                            "Score": f"{score}%",
+                            "Status": "Compliant" if score >= 90 else "Non-Compliant",
+                            "Findings": std_data.get("findings", 0)
+                        })
+                    
+                    df_audit = pd.DataFrame(audit_data)
+                    st.dataframe(df_audit, use_container_width=True, hide_index=True)
+                else:
+                    st.info("No audit data available")
+            
+            with col2:
+                st.markdown("**Overall Compliance Metrics**")
+                
+                overall_score = compliance_data.get("overall_score", 0)
+                
+                metrics_data = {
+                    "Metric": ["Overall Score", "Standards Tracked", "Compliant Standards"],
+                    "Value": [
+                        f"{overall_score}%",
+                        len(compliance_data.get("standards", {})),
+                        sum(1 for s in compliance_data.get("standards", {}).values() if s.get("score", 0) >= 90)
+                    ]
+                }
+                df_metrics = pd.DataFrame(metrics_data)
+                st.dataframe(df_metrics, use_container_width=True, hide_index=True)
+        else:
+            st.info("Audit data unavailable")
         
         st.markdown("---")
         
@@ -165,33 +221,48 @@ def show_risk_management(api_client: SecurityFrameworkAPIClient):
     with tab1:
         st.subheader("Risk Overview")
         
+        # Get security events as risk indicators
+        events_result = api_client.get_security_events()
+        severity_result = api_client.get_severity_distribution()
+        
         col1, col2, col3, col4 = st.columns(4)
         
-        with col1:
-            st.metric("High Risks", "3", "1 new")
-        
-        with col2:
-            st.metric("Medium Risks", "12", "2 new")
-        
-        with col3:
-            st.metric("Low Risks", "28", "5 new")
-        
-        with col4:
-            st.metric("Mitigated", "45", "8 this week")
+        if severity_result["success"]:
+            severity_data = severity_result["data"]
+            
+            with col1:
+                high_risks = severity_data.get("Critical", 0) + severity_data.get("High", 0)
+                st.metric("High Risks", high_risks)
+            
+            with col2:
+                medium_risks = severity_data.get("Medium", 0)
+                st.metric("Medium Risks", medium_risks)
+            
+            with col3:
+                low_risks = severity_data.get("Low", 0) + severity_data.get("Info", 0)
+                st.metric("Low Risks", low_risks)
+            
+            with col4:
+                total_events = sum(severity_data.values())
+                st.metric("Total Events", total_events)
+        else:
+            st.info("Risk metrics unavailable")
         
         st.markdown("---")
         
-        risk_data = {
-            "Risk ID": ["R-001", "R-002", "R-003", "R-004", "R-005"],
-            "Description": ["Data Breach", "System Downtime", "Compliance Violation", "Insider Threat", "Cyber Attack"],
-            "Severity": ["High", "Medium", "High", "Medium", "Critical"],
-            "Probability": ["Medium", "Low", "High", "Low", "Medium"],
-            "Impact": ["High", "Medium", "High", "High", "Critical"],
-            "Status": ["Open", "Mitigated", "Open", "Monitoring", "Open"]
-        }
-        
-        df_risks = pd.DataFrame(risk_data)
-        st.dataframe(df_risks, use_container_width=True, hide_index=True)
+        # Display high-severity events as risks
+        if events_result["success"] and events_result["data"]:
+            events_data = events_result["data"]
+            high_severity = [e for e in events_data if e.get("severity", "").lower() in ["high", "critical"]]
+            
+            if high_severity:
+                df_risks = pd.DataFrame(high_severity)
+                display_cols = [col for col in ["event_id", "description", "severity", "source", "event_type", "created_at"] if col in df_risks.columns]
+                st.dataframe(df_risks[display_cols], use_container_width=True, hide_index=True)
+            else:
+                st.info("No high-severity risks identified")
+        else:
+            st.info("Risk data unavailable")
     
     with tab2:
         st.subheader("Risk Assessment Matrix")

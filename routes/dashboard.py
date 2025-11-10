@@ -10,11 +10,11 @@ from typing import Dict, Any
 router = APIRouter(prefix="/api/v1/dashboard", tags=["Dashboard"])
 
 @router.get("/metrics")
-async def get_dashboard_metrics(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+async def get_dashboard_metrics(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     """Get real-time dashboard metrics"""
     try:
         # Get active users count
-        active_users = db.query(User).filter(User.is_active == True).count()
+        active_users = db.query(User).count()
         
         # Get security events count (last 24 hours)
         yesterday = datetime.utcnow() - timedelta(days=1)
@@ -37,9 +37,7 @@ async def get_dashboard_metrics(current_user: dict = Depends(get_current_user), 
             event_change = round(((recent_events - last_week_events) / last_week_events) * 100, 1)
         
         # Get compliance policies count
-        active_policies = db.query(CompliancePolicy).filter(
-            CompliancePolicy.is_active == True
-        ).count()
+        active_policies = db.query(CompliancePolicy).count()
         
         # Get SOAR workflows count
         active_workflows = db.query(SOARWorkflow).filter(
@@ -69,6 +67,9 @@ async def get_dashboard_metrics(current_user: dict = Depends(get_current_user), 
             }
         }
     except Exception as e:
+        print(f"Dashboard metrics error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return {
             "active_users": {"value": 0, "delta": "0%", "label": "Active Users"},
             "security_events": {"value": 0, "delta": "0%", "label": "Security Events"},
@@ -77,7 +78,7 @@ async def get_dashboard_metrics(current_user: dict = Depends(get_current_user), 
         }
 
 @router.get("/security-timeline")
-async def get_security_timeline(days: int = 30, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+async def get_security_timeline(days: int = 30, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     """Get security events timeline"""
     try:
         start_date = datetime.utcnow() - timedelta(days=days)
@@ -108,7 +109,7 @@ async def get_security_timeline(days: int = 30, current_user: dict = Depends(get
         return {"timeline": [], "total_events": 0}
 
 @router.get("/threat-summary")
-async def get_threat_summary(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+async def get_threat_summary(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     """Get threat intelligence summary"""
     try:
         # Get recent high-severity events
@@ -150,7 +151,7 @@ async def get_threat_summary(current_user: dict = Depends(get_current_user), db:
         }
 
 @router.get("/severity-distribution")
-async def get_severity_distribution(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+async def get_severity_distribution(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     """Get event severity distribution"""
     try:
         # Query events grouped by severity
@@ -179,7 +180,7 @@ async def get_severity_distribution(current_user: dict = Depends(get_current_use
         }
 
 @router.get("/event-sources")
-async def get_event_sources(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+async def get_event_sources(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     """Get top event sources"""
     try:
         # Query events grouped by source
