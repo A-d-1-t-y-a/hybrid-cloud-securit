@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, HTTPException, status, Depends, Response
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from database import get_db
@@ -46,13 +46,22 @@ async def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
     )
 
 @router.post("/login", response_model=LoginResponse)
-async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
+async def login(login_data: LoginRequest, response: Response, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == login_data.username).first()
     if not user or not verify_password(login_data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
     access_token = create_access_token(data={"sub": user.username, "role": user.role})
-    
+
+    # Set HttpOnly cookie for browser-based sessions
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        samesite="lax",
+        secure=False
+    )
+
     return LoginResponse(
         access_token=access_token,
         user=UserResponse(
@@ -63,6 +72,27 @@ async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
             is_active=user.is_active,
             created_at=user.created_at.isoformat()
         )
+    )
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(response: Response):
+    """Clear authentication cookie"""
+    response.delete_cookie("access_token")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+@router.get("/me", response_model=UserResponse)
+async def me(current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Return the currently authenticated user"""
+    user = db.query(User).filter(User.username == current_user["username"]).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return UserResponse(
+        id=user.id,
+        username=user.username,
+        email=user.email,
+        role=user.role,
+        is_active=user.is_active,
+        created_at=user.created_at.isoformat()
     )
 
 @router.get("/users/{user_id}", response_model=UserResponse)

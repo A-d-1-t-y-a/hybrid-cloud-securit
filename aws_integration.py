@@ -29,50 +29,149 @@ class AWSIntegration:
         self.initialized = False
         
         try:
-            # Check if AWS credentials are configured
-            if not settings.AWS_ACCESS_KEY_ID or not settings.AWS_SECRET_ACCESS_KEY:
+            # Check if AWS credentials are configured (already stripped in config.py)
+            access_key = settings.AWS_ACCESS_KEY_ID
+            secret_key = settings.AWS_SECRET_ACCESS_KEY
+            
+            if not access_key or not secret_key:
                 logger.warning("AWS credentials not configured. AWS features will be unavailable.")
+                logger.warning(f"Access Key ID present: {bool(access_key)}, Secret Key present: {bool(secret_key)}")
                 return
             
+            # Validate credentials format (basic check)
+            if len(access_key) < 16 or len(secret_key) < 30:
+                logger.warning(f"AWS credentials appear to be invalid format. Access Key length: {len(access_key)}, Secret Key length: {len(secret_key)}")
+            
+            # Log first few characters for debugging (without exposing full key)
+            logger.info(f"Initializing AWS services with Access Key starting with: {access_key[:4]}...")
+            
+            # Create AWS clients with explicit credentials
             self.s3_client = boto3.client(
                 's3',
-                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
                 region_name=settings.AWS_REGION
             )
             self.cloudwatch_client = boto3.client(
                 'cloudwatch',
-                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
                 region_name=settings.AWS_REGION
             )
             self.iam_client = boto3.client(
                 'iam',
-                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
                 region_name=settings.AWS_REGION
             )
             self.lambda_client = boto3.client(
                 'lambda',
-                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
                 region_name=settings.AWS_REGION
             )
             self.initialized = True
-            logger.info("AWS services initialized successfully")
+            logger.info(f"AWS services initialized successfully in region: {settings.AWS_REGION}")
         except Exception as e:
             logger.error(f"Failed to initialize AWS services: {e}")
+            logger.error(f"Access Key ID (first 4 chars): {settings.AWS_ACCESS_KEY_ID[:4] if settings.AWS_ACCESS_KEY_ID else 'N/A'}...")
             self.initialized = False
+    
+    def reinitialize(self):
+        """Reinitialize AWS services (useful if credentials were updated)"""
+        # Reset all clients
+        self.s3_client = None
+        self.cloudwatch_client = None
+        self.iam_client = None
+        self.lambda_client = None
+        self.initialized = False
+        
+        # Reinitialize with current credentials
+        try:
+            access_key = settings.AWS_ACCESS_KEY_ID
+            secret_key = settings.AWS_SECRET_ACCESS_KEY
+            
+            if not access_key or not secret_key:
+                logger.warning("Cannot reinitialize: AWS credentials not configured")
+                return
+            
+            # Create AWS clients with explicit credentials
+            self.s3_client = boto3.client(
+                's3',
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+                region_name=settings.AWS_REGION
+            )
+            self.cloudwatch_client = boto3.client(
+                'cloudwatch',
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+                region_name=settings.AWS_REGION
+            )
+            self.iam_client = boto3.client(
+                'iam',
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+                region_name=settings.AWS_REGION
+            )
+            self.lambda_client = boto3.client(
+                'lambda',
+                aws_access_key_id=access_key,
+                aws_secret_access_key=secret_key,
+                region_name=settings.AWS_REGION
+            )
+            self.initialized = True
+            logger.info(f"AWS services reinitialized successfully in region: {settings.AWS_REGION}")
+        except Exception as e:
+            logger.error(f"Failed to reinitialize AWS services: {e}")
+            self.initialized = False
+    
+    def _ensure_initialized(self):
+        """Ensure AWS services are initialized, reinitialize if credentials are now available"""
+        access_key = settings.AWS_ACCESS_KEY_ID
+        secret_key = settings.AWS_SECRET_ACCESS_KEY
+        
+        # Debug logging
+        if access_key:
+            logger.debug(f"Access Key ID found (length: {len(access_key)}, starts with: {access_key[:4]}...)")
+        else:
+            logger.debug("Access Key ID is empty or not set")
+        
+        if secret_key:
+            logger.debug(f"Secret Access Key found (length: {len(secret_key)})")
+        else:
+            logger.debug("Secret Access Key is empty or not set")
+        
+        # If not initialized but credentials are now available, try to initialize
+        if not self.initialized and access_key and secret_key:
+            logger.info("Credentials detected but services not initialized. Attempting to initialize...")
+            self.reinitialize()
+        elif not self.initialized:
+            logger.warning("AWS services not initialized and credentials are missing")
+        
+        return self.initialized
     
     def store_encrypted_data(self, data: str, key: str) -> Dict[str, Any]:
         """Store encrypted data in S3"""
         try:
+            # Try to initialize if credentials are available
+            if not self._ensure_initialized():
+                raise ValueError("AWS services not initialized. Please check your AWS credentials in .env file.")
+            
+            if not self.s3_client:
+                raise ValueError("AWS S3 client not available. Please check your AWS credentials in .env file.")
+            
+            # Check if bucket is configured (already stripped in config.py)
+            bucket = settings.AWS_S3_BUCKET
+            if not bucket:
+                raise ValueError("AWS_S3_BUCKET is not configured in .env file")
+            
             # Create S3 object key
             s3_key = f"encrypted-data/{key}"
             
             # Upload to S3
             self.s3_client.put_object(
-                Bucket=settings.AWS_S3_BUCKET,
+                Bucket=bucket,
                 Key=s3_key,
                 Body=data.encode('utf-8'),
                 ServerSideEncryption='AES256'
@@ -80,17 +179,51 @@ class AWSIntegration:
             
             return {
                 "status": "success",
-                "bucket": settings.AWS_S3_BUCKET,
+                "bucket": bucket,
                 "key": s3_key,
                 "timestamp": datetime.utcnow().isoformat()
             }
         except Exception as e:
-            logger.error(f"Failed to store data in S3: {e}")
-            raise
+            error_msg = str(e)
+            logger.error(f"Failed to store data in S3: {error_msg}")
+            
+            # Provide more helpful error messages
+            if "InvalidAccessKeyId" in error_msg:
+                raise ValueError(
+                    "Invalid AWS Access Key ID. Please verify:\n"
+                    "1. Your AWS_ACCESS_KEY_ID in .env file is correct\n"
+                    "2. There are no extra spaces or quotes around the key\n"
+                    "3. The key exists in your AWS account\n"
+                    "4. You have restarted the server after updating .env"
+                )
+            elif "SignatureDoesNotMatch" in error_msg:
+                raise ValueError(
+                    "AWS Secret Access Key mismatch. Please verify:\n"
+                    "1. Your AWS_SECRET_ACCESS_KEY in .env file is correct\n"
+                    "2. There are no extra spaces or quotes around the key\n"
+                    "3. The secret key matches the access key ID\n"
+                    "4. You have restarted the server after updating .env"
+                )
+            elif "NoSuchBucket" in error_msg:
+                raise ValueError(
+                    f"S3 bucket '{bucket}' does not exist. Please:\n"
+                    f"1. Verify the bucket name in AWS_S3_BUCKET is correct\n"
+                    f"2. Ensure the bucket exists in region {settings.AWS_REGION}\n"
+                    "3. Check your AWS credentials have permission to access this bucket"
+                )
+            else:
+                raise
     
     def retrieve_encrypted_data(self, key: str) -> str:
         """Retrieve encrypted data from S3"""
         try:
+            # Try to initialize if credentials are available
+            if not self._ensure_initialized():
+                raise ValueError("AWS services not initialized. Please check your AWS credentials in .env file.")
+            
+            if not self.s3_client:
+                raise ValueError("AWS S3 client not available. Please check your AWS credentials in .env file.")
+            
             s3_key = f"encrypted-data/{key}"
             
             response = self.s3_client.get_object(
@@ -107,6 +240,13 @@ class AWSIntegration:
                                value: float, unit: str = "Count") -> Dict[str, Any]:
         """Send metrics to CloudWatch"""
         try:
+            # Try to initialize if credentials are available
+            if not self._ensure_initialized():
+                raise ValueError("AWS services not initialized. Please check your AWS credentials in .env file.")
+            
+            if not self.cloudwatch_client:
+                raise ValueError("AWS CloudWatch client not available. Please check your AWS credentials in .env file.")
+            
             response = self.cloudwatch_client.put_metric_data(
                 Namespace=namespace,
                 MetricData=[
@@ -182,6 +322,24 @@ class AWSIntegration:
     def get_security_metrics(self) -> Dict[str, Any]:
         """Get security metrics from CloudWatch"""
         try:
+            # Try to initialize if credentials are available
+            if not self._ensure_initialized():
+                # Return empty metrics instead of raising error for better UX
+                return {
+                    "metrics": [],
+                    "period": "1 hour",
+                    "message": "AWS credentials not configured",
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            
+            if not self.cloudwatch_client:
+                return {
+                    "metrics": [],
+                    "period": "1 hour",
+                    "message": "AWS CloudWatch client not available",
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            
             end_time = datetime.utcnow()
             start_time = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
             
@@ -206,6 +364,21 @@ class AWSIntegration:
     def test_aws_connection(self) -> Dict[str, Any]:
         """Test AWS connection and services"""
         try:
+            # Try to initialize if credentials are available
+            if not self._ensure_initialized():
+                return {
+                    "status": "failed",
+                    "error": "AWS credentials not configured. Please set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY in .env file",
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            
+            if not self.s3_client or not self.cloudwatch_client or not self.iam_client:
+                return {
+                    "status": "failed",
+                    "error": "AWS clients not initialized. Please check your credentials.",
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            
             # Test S3 connection
             s3_response = self.s3_client.list_buckets()
             s3_status = "connected" if s3_response else "failed"

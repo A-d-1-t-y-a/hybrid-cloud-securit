@@ -5,6 +5,13 @@ from config import SecurityFrameworkConfig
 def display_user_authentication_form(api_client: SecurityFrameworkAPIClient):
     st.markdown("### Login to Hybrid Cloud Security Framework")
     
+    # Clear any stale session data before login
+    if st.session_state.get('authentication_token') and not st.session_state.get('is_authenticated'):
+        st.session_state.authentication_token = None
+        st.session_state.current_username = None
+        st.session_state.user_role = None
+        st.session_state.is_authenticated = False
+    
     with st.form("login_form"):
         username = st.text_input("Username", placeholder="Enter your username")
         password = st.text_input("Password", type="password", placeholder="Enter your password")
@@ -12,6 +19,9 @@ def display_user_authentication_form(api_client: SecurityFrameworkAPIClient):
         
         if submit_button:
             if username and password:
+                # Clear any previous session markers
+                st.session_state.is_authenticated = False
+                
                 with st.spinner("Authenticating..."):
                     authentication_result = api_client.authenticate_user(username, password)
                     
@@ -45,18 +55,12 @@ def display_user_authentication_form(api_client: SecurityFrameworkAPIClient):
             else:
                 st.error("Please fill in all fields")
 
-def display_user_logout_button():
+def display_user_logout_button(api_client: SecurityFrameworkAPIClient):
     if st.button("Logout", key="logout_button", use_container_width=True):
-        # Clear all authentication session state
-        st.session_state.authentication_token = None
-        st.session_state.current_username = None
-        st.session_state.user_role = None
-        st.session_state.is_authenticated = False
+        # Call backend to clear HttpOnly cookie and clear local session
+        api_client.logout()
         st.rerun()
 
 def check_user_authentication_status():
-    # Check if user is authenticated via session state
-    return (
-        st.session_state.get('is_authenticated', False) and
-        st.session_state.get('authentication_token') is not None
-    )
+    # Rely on server-validated session flag
+    return st.session_state.get('is_authenticated', False)

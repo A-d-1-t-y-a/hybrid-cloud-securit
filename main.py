@@ -13,7 +13,7 @@ app = FastAPI(
     description="Comprehensive security framework for hybrid cloud environments",
     version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url=None
 )
 
 app.add_middleware(

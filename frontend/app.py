@@ -35,6 +35,11 @@ def main():
         st.session_state.is_authenticated = False
     
     security_framework_api_client = SecurityFrameworkAPIClient(SecurityFrameworkConfig.API_BASE_URL)
+
+    # Validate any existing backend session via /me (server-side session with HttpOnly cookie)
+    if not st.session_state.get('is_authenticated', False):
+        if security_framework_api_client.ensure_authenticated():
+            st.session_state.is_authenticated = True
     
     if not check_user_authentication_status():
         st.title(SecurityFrameworkConfig.APP_TITLE)
@@ -76,7 +81,7 @@ def main():
             )
             
             st.markdown("---")
-            display_user_logout_button()
+            display_user_logout_button(security_framework_api_client)
         
         if selected_page == "Dashboard":
             show_dashboard(security_framework_api_client)

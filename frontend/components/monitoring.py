@@ -252,21 +252,26 @@ def show_incident_response(api_client: SecurityFrameworkAPIClient):
             col1, col2 = st.columns(2)
             with col1:
                 workflow_name = st.text_input("Workflow Name*")
-                trigger_event = st.selectbox("Trigger Event*", 
-                    ["High Severity Alert", "Data Breach", "Unauthorized Access", "System Anomaly", "Malware Detection"])
+                workflow_description = st.text_area("Description*", placeholder="Describe what this workflow does...")
             
             with col2:
-                actions = st.multiselect("Actions*", 
-                    ["Block IP", "Notify Team", "Isolate Host", "Generate Report", "Update Firewall", "Quarantine File"])
+                trigger_conditions = st.multiselect("Trigger Conditions*", 
+                    ["High Severity Alert", "Data Breach", "Unauthorized Access", "System Anomaly", "Malware Detection"],
+                    help="Select one or more conditions that will trigger this workflow")
                 status = st.selectbox("Status", ["active", "inactive"])
+            
+            actions = st.multiselect("Actions*", 
+                ["Block IP", "Notify Team", "Isolate Host", "Generate Report", "Update Firewall", "Quarantine File"],
+                help="Select actions to execute when workflow is triggered")
             
             col1, col2 = st.columns(2)
             with col1:
                 if st.form_submit_button("Create Workflow", use_container_width=True):
-                    if workflow_name and trigger_event and actions:
+                    if workflow_name and workflow_description and trigger_conditions and actions:
                         workflow_data = {
                             "name": workflow_name,
-                            "trigger_event": trigger_event,
+                            "description": workflow_description,
+                            "trigger_conditions": trigger_conditions,
                             "actions": actions,
                             "status": status
                         }
@@ -280,7 +285,7 @@ def show_incident_response(api_client: SecurityFrameworkAPIClient):
                         else:
                             st.error(f"Error: {result.get('error', 'Failed to create workflow')}")
                     else:
-                        st.error("Please fill in all required fields")
+                        st.error("Please fill in all required fields (marked with *)")
             
             with col2:
                 if st.form_submit_button("Cancel", use_container_width=True):

@@ -41,10 +41,13 @@ class Settings:
     AES_KEY = os.getenv("AES_KEY", "your-aes-key-here")
     
     # AWS Configuration
-    AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "")
-    AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "")
-    AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
-    AWS_S3_BUCKET = os.getenv("AWS_S3_BUCKET", "")
+    # Strip whitespace and remove quotes if present
+    _aws_access_key = os.getenv("AWS_ACCESS_KEY_ID", "").strip()
+    _aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY", "").strip()
+    AWS_ACCESS_KEY_ID = _aws_access_key.strip('"').strip("'").strip()
+    AWS_SECRET_ACCESS_KEY = _aws_secret_key.strip('"').strip("'").strip()
+    AWS_REGION = os.getenv("AWS_REGION", "us-east-1").strip().strip('"').strip("'")
+    AWS_S3_BUCKET = os.getenv("AWS_S3_BUCKET", "").strip().strip('"').strip("'")
     
     # Monitoring
     ELASTICSEARCH_URL = os.getenv("ELASTICSEARCH_URL", "http://localhost:9200")

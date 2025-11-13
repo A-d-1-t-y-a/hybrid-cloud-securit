@@ -8,7 +8,7 @@ Institution: National College of Ireland
 
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import HTTPException, status, Depends
+from fastapi import HTTPException, status, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from passlib.context import CryptContext
 from jose import JWTError, jwt
@@ -20,7 +20,7 @@ import base64
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # JWT token handling
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 def _prepare_password_for_bcrypt(password: str) -> str:
     """
@@ -78,18 +78,31 @@ def verify_token(token: str) -> Optional[dict]:
     except JWTError:
         return None
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """Get current user from token"""
-    token = credentials.credentials
+def get_current_user(request: Request, credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """Get current user from Authorization header or HttpOnly cookie."""
+    token: Optional[str] = None
+    # Prefer Authorization header if present
+    if credentials and credentials.scheme.lower() == "bearer":
+        token = credentials.credentials
+    # Fall back to cookie
+    if not token:
+        token = request.cookies.get("access_token")
+
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing authentication credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     payload = verify_token(token)
-    
     if payload is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     username: str = payload.get("sub")
     if username is None:
         raise HTTPException(
@@ -97,7 +110,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
             detail="Invalid authentication credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     return {"username": username, "role": payload.get("role", "user")}
 
 def require_admin(current_user: dict = Depends(get_current_user)):

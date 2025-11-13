@@ -144,12 +144,51 @@ def show_aws_integration(api_client: SecurityFrameworkAPIClient):
         if metrics_result["success"]:
             metrics_data = metrics_result["data"]
             
-            if isinstance(metrics_data, dict) and metrics_data:
-                # Display metrics as cards
-                for metric_name, metric_value in metrics_data.items():
-                    st.metric(metric_name.replace("_", " ").title(), metric_value)
+            # Handle the actual API response structure: {"metrics": [...], "period": "...", ...}
+            if isinstance(metrics_data, dict):
+                metrics_list = metrics_data.get("metrics", [])
+                
+                if isinstance(metrics_list, list) and len(metrics_list) > 0:
+                    # Extract metric values from datapoints
+                    metric_sum = 0
+                    metric_avg = 0
+                    metric_max = 0
+                    count = 0
+                    
+                    for datapoint in metrics_list:
+                        if isinstance(datapoint, dict):
+                            metric_sum += datapoint.get("Sum", 0) or 0
+                            metric_avg += datapoint.get("Average", 0) or 0
+                            metric_max = max(metric_max, datapoint.get("Maximum", 0) or 0)
+                            count += 1
+                    
+                    if count > 0:
+                        metric_avg = metric_avg / count
+                    
+                    # Display aggregated metrics
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Total Events", int(metric_sum))
+                    with col2:
+                        st.metric("Average Events", f"{metric_avg:.2f}")
+                    with col3:
+                        st.metric("Peak Events", int(metric_max))
+                    
+                    # Show period if available
+                    period = metrics_data.get("period", "")
+                    if period:
+                        st.caption(f"Period: {period}")
+                elif isinstance(metrics_list, list) and len(metrics_list) == 0:
+                    st.info("No CloudWatch metrics available. AWS may not be configured or no metrics have been sent yet.")
+                else:
+                    # Fallback: try to display as table if it's a different structure
+                    try:
+                        df_metrics = pd.DataFrame(metrics_list)
+                        st.dataframe(df_metrics, use_container_width=True, hide_index=True)
+                    except Exception:
+                        st.info("No CloudWatch metrics available")
             elif isinstance(metrics_data, list) and len(metrics_data) > 0:
-                # Display as table
+                # Display as table if it's a list
                 df_metrics = pd.DataFrame(metrics_data)
                 st.dataframe(df_metrics, use_container_width=True, hide_index=True)
             else:
@@ -220,44 +259,96 @@ def show_cloud_analytics(api_client: SecurityFrameworkAPIClient):
     if metrics_result["success"]:
         metrics_data = metrics_result["data"]
         
-        if isinstance(metrics_data, dict) and metrics_data:
-            # Create metrics visualization
-            col1, col2 = st.columns(2)
+        # Handle the actual API response structure: {"metrics": [...], "period": "...", ...}
+        if isinstance(metrics_data, dict):
+            metrics_list = metrics_data.get("metrics", [])
             
-            with col1:
-                st.markdown("**Security Metrics Summary**")
+            if isinstance(metrics_list, list) and len(metrics_list) > 0:
+                # Create metrics visualization
+                col1, col2 = st.columns(2)
                 
-                metrics_list = []
-                for metric_name, metric_value in metrics_data.items():
-                    metrics_list.append({
-                        "Metric": metric_name.replace("_", " ").title(),
-                        "Value": metric_value
-                    })
-                
-                if metrics_list:
-                    df_metrics = pd.DataFrame(metrics_list)
-                    st.dataframe(df_metrics, use_container_width=True, hide_index=True)
-            
-            with col2:
-                st.markdown("**Metrics Visualization**")
-                
-                if len(metrics_data) > 0:
-                    # Create bar chart
-                    df_chart = pd.DataFrame([
-                        {"Metric": k.replace("_", " ").title(), "Value": v} 
-                        for k, v in metrics_data.items()
-                    ])
+                with col1:
+                    st.markdown("**Security Metrics Summary**")
                     
-                    fig = px.bar(df_chart, x="Metric", y="Value",
-                                color="Value",
-                                color_continuous_scale="Blues")
-                    fig.update_layout(
-                        plot_bgcolor='rgba(0,0,0,0)',
-                        paper_bgcolor='rgba(0,0,0,0)',
-                        font_color='white',
-                        showlegend=False
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
+                    # Extract and aggregate metrics from datapoints
+                    summary_data = []
+                    total_sum = 0
+                    total_avg = 0
+                    total_max = 0
+                    count = 0
+                    
+                    for datapoint in metrics_list:
+                        if isinstance(datapoint, dict):
+                            sum_val = datapoint.get("Sum", 0) or 0
+                            avg_val = datapoint.get("Average", 0) or 0
+                            max_val = datapoint.get("Maximum", 0) or 0
+                            
+                            total_sum += sum_val
+                            total_avg += avg_val
+                            total_max = max(total_max, max_val)
+                            count += 1
+                    
+                    if count > 0:
+                        total_avg = total_avg / count
+                    
+                    summary_data = [
+                        {"Metric": "Total Events", "Value": int(total_sum)},
+                        {"Metric": "Average Events", "Value": f"{total_avg:.2f}"},
+                        {"Metric": "Peak Events", "Value": int(total_max)},
+                        {"Metric": "Data Points", "Value": count}
+                    ]
+                    
+                    df_metrics = pd.DataFrame(summary_data)
+                    st.dataframe(df_metrics, use_container_width=True, hide_index=True)
+                
+                with col2:
+                    st.markdown("**Metrics Visualization**")
+                    
+                    # Create bar chart from datapoints
+                    chart_data = []
+                    for i, datapoint in enumerate(metrics_list):
+                        if isinstance(datapoint, dict):
+                            timestamp = datapoint.get("Timestamp", f"Point {i+1}")
+                            sum_val = datapoint.get("Sum", 0) or 0
+                            
+                            # Format timestamp if it's a datetime string
+                            if isinstance(timestamp, str):
+                                try:
+                                    from datetime import datetime
+                                    dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                                    timestamp = dt.strftime("%H:%M")
+                                except:
+                                    timestamp = f"Point {i+1}"
+                            
+                            chart_data.append({
+                                "Time": str(timestamp),
+                                "Value": float(sum_val)
+                            })
+                    
+                    if chart_data:
+                        df_chart = pd.DataFrame(chart_data)
+                        
+                        fig = px.bar(df_chart, x="Time", y="Value",
+                                    color="Value",
+                                    color_continuous_scale="Blues",
+                                    title="Security Events Over Time")
+                        fig.update_layout(
+                            plot_bgcolor='rgba(0,0,0,0)',
+                            paper_bgcolor='rgba(0,0,0,0)',
+                            font_color='white',
+                            showlegend=False,
+                            xaxis_title="Time",
+                            yaxis_title="Event Count"
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.info("No chart data available")
+            else:
+                st.info("No security metrics data available from CloudWatch. AWS may not be configured or no metrics have been sent yet.")
+        elif isinstance(metrics_data, list) and len(metrics_data) > 0:
+            # Display as table if it's a list
+            df_metrics = pd.DataFrame(metrics_data)
+            st.dataframe(df_metrics, use_container_width=True, hide_index=True)
         else:
             st.info("No security metrics data available from CloudWatch")
     else:
