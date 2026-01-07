@@ -12,26 +12,45 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any
 from sqlalchemy.orm import Session
 from models import SecurityEvent, AuditLog
+from ml_engine import anomaly_detector
 
 class MonitoringService:
     """Security monitoring service"""
     
     def __init__(self, db: Session):
         self.db = db
+        # Ensure model is ready
+        if not anomaly_detector.is_trained:
+            anomaly_detector.train()
     
     def ingest_event(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
         """Ingest security event"""
         try:
+            # RUN REAL ML PREDICTION
+            ml_analysis = anomaly_detector.predict(event_data)
+            
+            # Enrich metadata with ML scores
+            metadata = event_data.get("metadata", {})
+            metadata.update({
+                "ml_anomaly_score": ml_analysis.get("anomaly_score"),
+                "ml_risk_level": ml_analysis.get("risk_level")
+            })
+            
+            # Auto-escalate severity if ML says CRITICAL
+            severity = event_data.get("severity", "low")
+            if ml_analysis.get("is_anomaly"):
+                severity = "critical" if ml_analysis.get("risk_level") == "CRITICAL" else "high"
+
             # Create security event
             event = SecurityEvent(
                 event_id=f"evt_{self._generate_id()}",
                 source=event_data.get("source", "unknown"),
                 event_type=event_data.get("event_type", "unknown"),
-                severity=event_data.get("severity", "low"),
-                description=event_data.get("description", ""),
+                severity=severity,
+                description=event_data.get("description", "") + f" [ML Risk: {ml_analysis.get('risk_level')}]",
                 user_id=event_data.get("user_id"),
                 ip_address=event_data.get("ip_address"),
-                event_metadata=event_data.get("metadata", {})
+                event_metadata=metadata
             )
             
             self.db.add(event)
@@ -40,7 +59,8 @@ class MonitoringService:
             return {
                 "message": "Event ingested successfully",
                 "event_id": event.event_id,
-                "timestamp": event.created_at.isoformat()
+                "timestamp": event.created_at.isoformat(),
+                "ml_analysis": ml_analysis
             }
         except Exception as e:
             self.db.rollback()
@@ -77,8 +97,9 @@ class MonitoringService:
                 "recent_events_count": len(recent_events),
                 "top_event_types": ["authentication", "data_access", "system_change"],
                 "top_sources": ["firewall", "ids", "application"],
-                "threat_indicators_count": random.randint(5, 20),
-                "anomaly_detector_trained": True
+                "threat_indicators_count": severity_counts.get("critical", 0) + severity_counts.get("high", 0),
+                "anomaly_detector_trained": anomaly_detector.is_trained,
+                "ml_engine_status": "online"
             }
         except Exception as e:
             raise ValueError(f"Failed to get dashboard data: {str(e)}")
